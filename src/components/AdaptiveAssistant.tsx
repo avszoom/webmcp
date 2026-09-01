@@ -10,7 +10,7 @@ import { approvedProfileDemoCalls, type PrefillToolCall } from '../webmcp/demoCa
 import { useApplication } from '../state/ApplicationContext'
 import { useWebMcp } from '../webmcp/WebMcpContext'
 import type { Locale } from '../i18n'
-import { BotIcon, CheckIcon, LockIcon, SparkleIcon, WarningIcon, XIcon } from './Icons'
+import { BotIcon, CheckIcon, LockIcon, RefreshIcon, SparkleIcon, WarningIcon, XIcon } from './Icons'
 
 type InterviewStage = 'intro' | 'interview' | 'complete'
 
@@ -32,28 +32,28 @@ const content = {
     startVoice: 'Start with voice', type: 'Type instead', later: 'Not now',
     trip: 'Start anywhere: why are you visiting the United States, where will you stay, and what dates are you considering?',
     placeholder: 'Speak or type naturally…', send: 'Send', listening: 'Listening…',
-    activity: 'Agent decisions & WebMCP actions', routePending: 'Route not selected',
+    activity: 'Agent decisions & WebMCP actions', routePending: 'Route not selected', restart: 'Start over',
   },
   es: {
     greeting: 'Esta solicitud es deliberadamente larga, pero podemos completar juntos la ruta aplicable. Cuénteme su viaje con sus propias palabras; decidiré qué preguntar después y explicaré cada acción WebMCP.',
     privacy: 'Su respuesta se envía a OpenAI para planificar. La clave permanece en el servidor, este sitio valida cada valor y no se envía ninguna solicitud.',
     startVoice: 'Comenzar por voz', type: 'Escribir', later: 'Ahora no',
     trip: 'Empiece donde quiera: ¿por qué visita Estados Unidos, dónde se alojará y qué fechas considera?',
-    placeholder: 'Hable o escriba naturalmente…', send: 'Enviar', listening: 'Escuchando…', activity: 'Decisiones y acciones WebMCP', routePending: 'Ruta sin seleccionar',
+    placeholder: 'Hable o escriba naturalmente…', send: 'Enviar', listening: 'Escuchando…', activity: 'Decisiones y acciones WebMCP', routePending: 'Ruta sin seleccionar', restart: 'Empezar de nuevo',
   },
   fr: {
     greeting: 'Cette demande est volontairement longue, mais nous pouvons terminer ensemble le parcours applicable. Décrivez votre voyage librement ; je choisirai la prochaine question et expliquerai chaque action WebMCP.',
     privacy: 'Votre réponse est envoyée à OpenAI pour la planification. La clé reste côté serveur, ce site valide chaque valeur et rien n’est soumis.',
     startVoice: 'Commencer par la voix', type: 'Écrire', later: 'Plus tard',
     trip: 'Commencez librement : pourquoi allez-vous aux États-Unis, où séjournerez-vous et à quelles dates ?',
-    placeholder: 'Parlez ou écrivez naturellement…', send: 'Envoyer', listening: 'Écoute…', activity: 'Décisions et actions WebMCP', routePending: 'Parcours non sélectionné',
+    placeholder: 'Parlez ou écrivez naturellement…', send: 'Envoyer', listening: 'Écoute…', activity: 'Décisions et actions WebMCP', routePending: 'Parcours non sélectionné', restart: 'Recommencer',
   },
   hi: {
     greeting: 'यह आवेदन जानबूझकर लंबा है, लेकिन हम सही रास्ता साथ मिलकर पूरा कर सकते हैं। अपनी यात्रा सामान्य भाषा में बताइए; मैं अगला उपयोगी सवाल चुनूँगा और हर WebMCP कार्रवाई समझाऊँगा।',
     privacy: 'योजना बनाने के लिए आपका उत्तर OpenAI को भेजा जाता है। API कुंजी सर्वर पर रहती है, वेबसाइट हर मान जाँचती है और कुछ भी जमा नहीं होता।',
     startVoice: 'आवाज़ से शुरू करें', type: 'टाइप करें', later: 'अभी नहीं',
     trip: 'कहीं से भी शुरू करें: आप अमेरिका क्यों जा रहे हैं, कहाँ रहेंगे और कौन-सी तारीखें सोच रहे हैं?',
-    placeholder: 'स्वाभाविक रूप से बोलें या लिखें…', send: 'भेजें', listening: 'सुन रहा हूँ…', activity: 'एजेंट निर्णय और WebMCP कार्रवाई', routePending: 'रास्ता चुना नहीं गया',
+    placeholder: 'स्वाभाविक रूप से बोलें या लिखें…', send: 'भेजें', listening: 'सुन रहा हूँ…', activity: 'एजेंट निर्णय और WebMCP कार्रवाई', routePending: 'रास्ता चुना नहीं गया', restart: 'फिर से शुरू करें',
   },
 } as const
 
@@ -74,7 +74,7 @@ function assistantText(plan: InterviewTurnPlan) {
     : `${plan.assistant_message} ${plan.next_question}`
 }
 
-export function AdaptiveAssistant({ locale }: { locale: Locale }) {
+export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRestart: () => void }) {
   const { state, metrics } = useApplication()
   const webMcp = useWebMcp()
   const copy = content[locale]
@@ -318,9 +318,14 @@ export function AdaptiveAssistant({ locale }: { locale: Locale }) {
         </div>
       )}
 
-      <button className="assistant-activity-toggle" onClick={() => setActivityOpen((value) => !value)}>
-        <span><SparkleIcon /> {copy.activity}</span><strong>{state.activity.length}</strong>
-      </button>
+      <div className="assistant-footer-actions">
+        <button className="assistant-activity-toggle" onClick={() => setActivityOpen((value) => !value)}>
+          <span><SparkleIcon /> {copy.activity}</span><strong>{state.activity.length}</strong>
+        </button>
+        <button className="assistant-restart-button" onClick={onRestart}>
+          <RefreshIcon /> {copy.restart}
+        </button>
+      </div>
       {activityOpen && (
         <div className="assistant-activity">
           <div className="activity-route"><strong>{route?.labels.join(' → ') ?? copy.routePending}</strong><span>{routePreview.applicableQuestionIds.length} semantic requirements visible to the agent</span></div>

@@ -789,6 +789,9 @@ textarea:focus-visible {
 }
 
 .workspace-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 40;
   min-height: 69px;
   padding: 14px 26px;
   display: flex;
@@ -853,6 +856,30 @@ textarea:focus-visible {
 }
 
 .text-button svg {
+  width: 15px;
+}
+
+.restart-application-button {
+  min-height: 38px;
+  padding: 0 13px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #005ea8;
+  background: #fff;
+  border: 2px solid #005ea8;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.restart-application-button:hover {
+  color: #fff;
+  background: #005ea8;
+}
+
+.restart-application-button svg {
   width: 15px;
 }
 
@@ -2467,10 +2494,14 @@ textarea:focus-visible {
 .send-button { padding: 0 12px; color: #fff; background: #005ea8; border: 0; border-radius: 3px; cursor: pointer; font-size: 11px; font-weight: 700; }
 .send-button:disabled { opacity: .45; cursor: default; }
 
-.assistant-activity-toggle { min-height: 39px; padding: 0 13px; display: flex; align-items: center; justify-content: space-between; color: #162e51; background: #fff; border: 0; border-top: 1px solid #d6d7d9; cursor: pointer; font-size: 10px; font-weight: 700; }
+.assistant-footer-actions { min-height: 42px; display: grid; grid-template-columns: minmax(0, 1fr) auto; background: #fff; border-top: 1px solid #d6d7d9; }
+.assistant-activity-toggle { min-width: 0; min-height: 41px; padding: 0 13px; display: flex; align-items: center; justify-content: space-between; color: #162e51; background: #fff; border: 0; cursor: pointer; font-size: 10px; font-weight: 700; }
 .assistant-activity-toggle span { display: flex; align-items: center; gap: 5px; }
 .assistant-activity-toggle svg { width: 14px; }
 .assistant-activity-toggle strong { min-width: 23px; padding: 3px 5px; color: #fff; background: #005ea8; border-radius: 10px; }
+.assistant-restart-button { min-height: 41px; padding: 0 13px; display: inline-flex; align-items: center; gap: 6px; color: #a10f2b; background: #fff; border: 0; border-left: 1px solid #d6d7d9; cursor: pointer; font-size: 10px; font-weight: 700; white-space: nowrap; }
+.assistant-restart-button:hover { color: #fff; background: #a10f2b; }
+.assistant-restart-button svg { width: 14px; }
 .assistant-activity { max-height: 190px; padding: 8px 12px 12px; overflow-y: auto; background: #f7f8fa; border-top: 1px solid #d6d7d9; }
 .assistant-activity > div { padding: 7px 0; display: flex; gap: 7px; border-bottom: 1px solid #e5e5e5; }
 .assistant-activity > div > svg { width: 15px; flex: 0 0 auto; color: #2e8540; }
@@ -2495,6 +2526,8 @@ textarea:focus-visible {
   .government-site .status-grid { grid-template-columns: repeat(2, 1fr); }
   .government-site .status-card--primary { grid-column: auto; }
   .adaptive-assistant { right: 7px; bottom: 7px; width: calc(100vw - 14px); max-height: calc(100vh - 14px); }
+  .workspace-topbar { padding: 10px 14px; }
+  .saved-state { display: none; }
 }
 
 @media (max-width: 640px) {

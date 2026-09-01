@@ -11,6 +11,7 @@ import { AdaptiveAssistant } from './AdaptiveAssistant'
 export function ApplicationWorkspace() {
   const { state, dispatch, metrics } = useApplication()
   const [language, setLanguage] = useState<Locale>('en')
+  const [assistantSession, setAssistantSession] = useState(0)
   const applicableIds = useMemo(
     () => new Set(state.flow?.applicableQuestionIds ?? questions.map((question) => question.id)),
     [state.flow],
@@ -34,6 +35,17 @@ export function ApplicationWorkspace() {
     }
   }
 
+  const restartApplication = () => {
+    const confirmed = window.confirm(
+      'Start a fresh application? This will clear every answer, the selected path, and the assistant conversation stored on this device.',
+    )
+    if (!confirmed) return
+
+    dispatch({ type: 'RESET_APPLICATION' })
+    setAssistantSession((current) => current + 1)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   return (
     <div className="government-site">
       <GovernmentHeader language={language} onLanguageChange={setLanguage} />
@@ -49,10 +61,9 @@ export function ApplicationWorkspace() {
             <div className="topbar-actions">
               <span className="saved-state"><CheckIcon /> {t(language, 'saved')}</span>
               <button
-                className="text-button"
-                onClick={() => {
-                  if (window.confirm('Clear this fictional application and restart the assistant?')) dispatch({ type: 'RESET_APPLICATION' })
-                }}
+                className="restart-application-button"
+                onClick={restartApplication}
+                aria-label="Start a fresh application"
               ><RefreshIcon /> {t(language, 'reset')}</button>
             </div>
           </header>
@@ -119,7 +130,7 @@ export function ApplicationWorkspace() {
           </div>
         </div>
       </main>
-      <AdaptiveAssistant locale={language} />
+      <AdaptiveAssistant key={assistantSession} locale={language} onRestart={restartApplication} />
     </div>
   )
 }
