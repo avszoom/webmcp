@@ -33,7 +33,7 @@ const interviewSchema = {
     },
     updates: {
       type: 'array',
-      maxItems: 12,
+      maxItems: 30,
       items: {
         type: 'object',
         properties: {
@@ -51,13 +51,18 @@ const interviewSchema = {
       maxItems: 12,
       items: { type: 'string', enum: questionIds },
     },
+    requested_question_ids: {
+      type: 'array',
+      maxItems: 18,
+      items: { type: 'string', enum: questionIds },
+    },
     next_question_id: nullableEnum(nextQuestionIds),
     next_question: { anyOf: [{ type: 'string', minLength: 1, maxLength: 180 }, { type: 'null' }] },
     is_complete: { type: 'boolean' },
   },
   required: [
     'assistant_message', 'decision_summary', 'route', 'updates',
-    'confirm_question_ids', 'next_question_id', 'next_question', 'is_complete',
+    'confirm_question_ids', 'requested_question_ids', 'next_question_id', 'next_question', 'is_complete',
   ],
   additionalProperties: false,
 }
@@ -72,8 +77,8 @@ Rules:
 3. This is a fresh user with no connected profile and no pre-approved personal facts. Every update must use source=user_statement and be directly supported by the latest answer. Never fill a field merely because it is typical, likely, or useful.
 4. Sensitive existing answers stay pending until final review. Populate confirm_question_ids only if the latest answer explicitly confirms sensitive answers. Never treat silence, a generic yes to another question, or model inference as confirmation.
 5. Populate review_* fields only when the user explicitly confirms the relevant declaration. The final review can bundle the five declarations when the user clearly confirms all of them.
-6. Ask exactly one short, specific next question. It may request at most three closely related missing facts, and must name those facts explicitly. Avoid broad prompts such as "tell me more." Prefer questions like "Who will pay, and what are your employer and job title?"
-7. next_question must be at most 24 words. assistant_message must be one short acknowledgement and must not repeat the question. decision_summary must be a compact factual explanation.
+6. Design each next turn as a high-yield intake bundle. Put 8 to 15 compatible missing field IDs in requested_question_ids, prioritizing facts that can eliminate branches or complete whole sections. Aim to halve the remaining applicable fields per turn when practical. Never include an already answered or inapplicable field. Keep sensitive final confirmations and review declarations separate from unrelated intake.
+7. Ask exactly one short next_question of at most 18 words that introduces the displayed field checklist; do not list every field in the sentence. assistant_message must be one short acknowledgement and must not repeat the question. decision_summary must be a compact factual explanation.
 8. Respond in the requested locale. Skip anything already resolved or inapplicable. Do not claim the form is complete unless projected missing applicable questions, confirmations, evidence, and conflicts are all zero.
 9. This is a fictional application. Never claim submission, approval, legal advice, or government affiliation.`
 
@@ -145,7 +150,7 @@ async function planInterview(request, env) {
   if (!payload || typeof payload.latest_answer !== 'string' || !payload.latest_answer.trim()) {
     return json({ error: 'An answer is required.' }, 400);
   }
-  if (payload.latest_answer.length > 1500 || typeof payload.last_question !== 'string' || payload.last_question.length > 900) {
+  if (payload.latest_answer.length > 5000 || typeof payload.last_question !== 'string' || payload.last_question.length > 4000) {
     return json({ error: 'The interview answer or question is too long.' }, 400);
   }
   if (!env.OPENAI_API_KEY) return json({ error: 'The AI interview is not configured.' }, 503);
@@ -173,7 +178,7 @@ async function planInterview(request, env) {
             schema: INTERVIEW_SCHEMA,
           },
         },
-        max_output_tokens: 1200,
+        max_output_tokens: 2400,
         store: false,
       }),
     });

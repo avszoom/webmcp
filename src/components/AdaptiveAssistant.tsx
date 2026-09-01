@@ -9,7 +9,8 @@ import { questions } from '../data/questions'
 import type { PrefillToolCall } from '../webmcp/demoCalls'
 import { useApplication } from '../state/ApplicationContext'
 import { useWebMcp } from '../webmcp/WebMcpContext'
-import type { Locale } from '../i18n'
+import { questionName, sectionName, type Locale } from '../i18n'
+import type { SectionId } from '../types'
 import { BotIcon, CheckIcon, LockIcon, RefreshIcon, SparkleIcon, WarningIcon, XIcon } from './Icons'
 
 type InterviewStage = 'intro' | 'interview' | 'complete'
@@ -20,6 +21,7 @@ interface ChatMessage {
   text: string
   detail?: string
   progress?: TurnProgress
+  requestedQuestionIds?: string[]
 }
 
 interface TurnProgress {
@@ -38,12 +40,20 @@ const speechLocales: Record<Locale, string> = {
   en: 'en-US', es: 'es-US', fr: 'fr-FR', hi: 'hi-IN',
 }
 
+const initialFastIntakeIds = [
+  'travel_purpose', 'arrival_date', 'departure_date', 'destination_city', 'stay_address', 'prior_visits', 'prior_refusal',
+  'legal_given_names', 'legal_family_name', 'date_of_birth', 'place_of_birth',
+  'passport_number', 'passport_country', 'passport_issue_date', 'passport_expiry_date',
+  'email', 'phone', 'current_street', 'current_city', 'current_region', 'current_postal_code', 'current_country',
+  'current_employer', 'job_title', 'marital_status', 'dependants',
+]
+
 const content = {
   en: {
     greeting: 'This application is deliberately long, but we can finish the applicable path together. I only use facts you state, remove questions that do not apply, and show every WebMCP action.',
     privacy: 'Your answer is sent to OpenAI for planning. The API key stays server-side, every value is validated by this website, and nothing is submitted.',
     startVoice: 'Start with voice', type: 'Type instead', later: 'Not now',
-    trip: 'Start anywhere: why are you visiting the United States, where will you stay, and what dates are you considering?',
+    trip: 'Take one minute and share anything you know from these groups—in any order. Skip anything unknown.',
     placeholder: 'Speak or type naturally…', send: 'Send', listening: 'Listening through pauses…',
     listeningHint: 'Take your time. Click the red square when you are finished, then review and send.',
     activity: 'Agent decisions & WebMCP actions', routePending: 'Route not selected', restart: 'Start over',
@@ -97,6 +107,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   const keepListeningRef = useRef(false)
   const committedTranscriptRef = useRef('')
   const conversationRef = useRef<HTMLDivElement | null>(null)
+  const transcriptRef = useRef<HTMLTextAreaElement | null>(null)
   const stageRef = useRef<InterviewStage>('intro')
   const processAnswerRef = useRef<(answer: string) => Promise<void>>(async () => {})
 
@@ -117,11 +128,27 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
     if (conversationRef.current) conversationRef.current.scrollTop = conversationRef.current.scrollHeight
   }, [messages, working])
 
+  useEffect(() => {
+    const transcript = transcriptRef.current
+    if (!transcript) return
+    transcript.style.height = 'auto'
+    transcript.style.height = `${Math.min(Math.max(transcript.scrollHeight, 132), 260)}px`
+    transcript.scrollTop = transcript.scrollHeight
+  }, [draft, listening])
+
   const route = state.flow
   const routePreview = useMemo(() => route ?? buildApplicationFlow('undetermined'), [route])
 
-  const addMessage = (role: ChatMessage['role'], text: string, detail?: string, progress?: TurnProgress) => {
-    setMessages((current) => [...current, { id: `${role}-${Date.now()}-${current.length}`, role, text, detail, progress }])
+  const addMessage = (
+    role: ChatMessage['role'],
+    text: string,
+    detail?: string,
+    progress?: TurnProgress,
+    requestedQuestionIds?: string[],
+  ) => {
+    setMessages((current) => [...current, {
+      id: `${role}-${Date.now()}-${current.length}`, role, text, detail, progress, requestedQuestionIds,
+    }])
   }
 
   const runCalls = async (calls: PrefillToolCall[]) => {
@@ -225,7 +252,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
 
       await runCalls(calls)
       setTurnNumber((current) => current + 1)
-      addMessage('agent', assistantText(plan), plan.decision_summary, progress)
+      addMessage('agent', assistantText(plan), plan.decision_summary, progress, plan.requested_question_ids)
       setLastQuestion(plan.next_question ?? '')
       if (plan.is_complete) {
         stageRef.current = 'complete'
@@ -244,8 +271,9 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   const begin = (withVoice: boolean) => {
     stageRef.current = 'interview'
     setStage('interview')
-    setLastQuestion(copy.trip)
-    addMessage('agent', copy.trip)
+    const requestedLabels = initialFastIntakeIds.map((id) => questionMap.get(id)?.label ?? id)
+    setLastQuestion(`${copy.trip} Requested fields: ${requestedLabels.join(', ')}`)
+    addMessage('agent', copy.trip, undefined, undefined, initialFastIntakeIds)
     if (withVoice) window.setTimeout(startListening, 300)
   }
 
@@ -315,10 +343,11 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   }
 
   return (
-    <section className="adaptive-assistant" role="dialog" aria-label="Application assistant">
+    <section className="adaptive-assistant" role="dialog" aria-modal="true" aria-label="Application assistant">
+      <div className="assistant-glass-panel">
       <header className="assistant-header">
-        <span className="assistant-avatar"><BotIcon /></span>
-        <div><strong>Adaptive Application Agent</strong><span><i /> GPT-5.6 Luna planning · WebMCP execution</span></div>
+        <span className="assistant-avatar assistant-orb"><BotIcon /></span>
+        <div><strong>Voice Application Guide</strong><span><i /> Listening, reasoning and filling with WebMCP</span></div>
         <button onClick={() => setOpen(false)} aria-label="Close assistant"><XIcon /></button>
       </header>
 
@@ -336,6 +365,9 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
             {message.role === 'agent' && <span><BotIcon /></span>}
             <div className="chat-message__body">
               <p>{message.text}</p>
+              {message.requestedQuestionIds && message.requestedQuestionIds.length > 0 && (
+                <RequestedFactsCard locale={locale} questionIds={message.requestedQuestionIds} />
+              )}
               {message.detail && <small><SparkleIcon /> {message.detail}</small>}
               {message.progress && <TurnProgressCard progress={message.progress} />}
             </div>
@@ -374,11 +406,12 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         <div className="assistant-composer">
           <div>
             <button className={`voice-button ${listening ? 'voice-button--listening' : ''}`} onClick={listening ? stopListening : startListening} aria-label={listening ? 'Stop voice recording' : 'Answer by voice'} aria-pressed={listening}>{listening ? '■' : '●'}</button>
-            <textarea value={draft} maxLength={1500} onChange={(event) => setDraft(event.target.value)} placeholder={listening ? copy.listening : copy.placeholder} rows={2} onKeyDown={(event) => {
+            <textarea ref={transcriptRef} value={draft} maxLength={5000} onChange={(event) => setDraft(event.target.value)} placeholder={listening ? copy.listening : copy.placeholder} rows={5} onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (listening) stopListening(); void processAnswerRef.current(draft) }
             }} />
             <button className="send-button" disabled={!draft.trim() || working || listening} onClick={() => void processAnswerRef.current(draft)}>{copy.send}</button>
           </div>
+          <div className="transcript-meta"><span>{draft.trim() ? `${draft.trim().split(/\s+/).length} words captured` : 'Your live transcript will appear here'}</span><strong>{listening ? 'Listening until you stop' : 'Review before sending'}</strong></div>
           {listening && <div className="voice-listening-hint"><span>■</span>{copy.listeningHint}</div>}
         </div>
       )}
@@ -399,7 +432,34 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
           ))}
         </div>
       )}
+      </div>
     </section>
+  )
+}
+
+function RequestedFactsCard({ locale, questionIds }: { locale: Locale; questionIds: string[] }) {
+  const groups = new Map<string, typeof questions>()
+  for (const questionId of questionIds) {
+    const question = questionMap.get(questionId)
+    if (!question) continue
+    const group = groups.get(question.sectionId) ?? []
+    group.push(question)
+    groups.set(question.sectionId, group)
+  }
+
+  return (
+    <div className="requested-facts">
+      <div className="requested-facts__top"><SparkleIcon /><span><strong>FAST INTAKE</strong>{questionIds.length} fields can be completed from this answer</span></div>
+      <div className="requested-facts__groups">
+        {[...groups.entries()].map(([sectionId, sectionQuestions]) => (
+          <div key={sectionId}>
+            <strong>{sectionName(locale, sectionId as SectionId, sectionId)}</strong>
+            <span>{sectionQuestions.map((question) => questionName(locale, question.id, question.label)).join(' · ')}</span>
+          </div>
+        ))}
+      </div>
+      <small>Say only what you know. The agent will ask for remaining gaps later.</small>
+    </div>
   )
 }
 

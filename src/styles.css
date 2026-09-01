@@ -2906,3 +2906,172 @@ textarea:focus-visible {
   .government-site .sidebar { min-height: auto; border: 0; border-bottom: 1px solid #d6d7d9; }
   .government-site .section-nav { display: none; }
 }
+
+/* Voice-first glass assistant */
+.adaptive-assistant {
+  inset: 0;
+  width: auto;
+  max-height: none;
+  padding: clamp(14px, 3vw, 34px);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  background:
+    radial-gradient(circle at 50% 78%, rgba(33, 150, 243, .18), transparent 34%),
+    rgba(4, 18, 38, .38);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: blur(7px) saturate(1.12);
+}
+
+.assistant-glass-panel {
+  width: min(820px, calc(100vw - 28px));
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(145deg, rgba(9, 35, 67, .88), rgba(13, 50, 79, .72));
+  border: 1px solid rgba(255, 255, 255, .3);
+  border-radius: 28px;
+  box-shadow: 0 30px 100px rgba(0, 10, 30, .48), inset 0 1px rgba(255,255,255,.16);
+  backdrop-filter: blur(28px) saturate(1.25);
+}
+
+.assistant-glass-panel .assistant-header {
+  min-height: 84px;
+  padding: 14px 18px;
+  background: transparent;
+  border-bottom: 1px solid rgba(255,255,255,.16);
+}
+
+.assistant-glass-panel .assistant-header strong { font: 700 19px/1.1 Arial, sans-serif; }
+.assistant-glass-panel .assistant-header div span { color: rgba(235,247,255,.72); }
+.assistant-glass-panel .assistant-header > button { border-radius: 50%; background: rgba(255,255,255,.09); }
+
+.assistant-orb {
+  position: relative;
+  width: 54px;
+  height: 54px;
+  overflow: visible;
+  color: #fff;
+  background: radial-gradient(circle at 32% 28%, #fff 0 4%, #58d9ff 15%, #3976ff 44%, #b450ff 70%, #ff4d94 100%);
+  box-shadow: 0 0 24px rgba(77,183,255,.6), 0 0 50px rgba(156,70,255,.28);
+  animation: siriOrb 3.2s ease-in-out infinite;
+}
+
+.assistant-orb::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  z-index: -1;
+  border: 1px solid rgba(116,220,255,.45);
+  border-radius: 50%;
+  animation: siriRing 2.2s ease-out infinite;
+}
+
+.assistant-orb svg { width: 23px; filter: drop-shadow(0 2px 5px rgba(4,20,50,.4)); }
+@keyframes siriOrb { 50% { transform: scale(1.06) rotate(4deg); filter: hue-rotate(28deg); } }
+@keyframes siriRing { 70%, 100% { opacity: 0; transform: scale(1.42); } }
+
+.assistant-glass-panel .route-strip {
+  color: #e8fff0;
+  background: rgba(31, 157, 91, .15);
+  border-color: rgba(127,234,170,.28);
+}
+.assistant-glass-panel .route-strip > span,
+.assistant-glass-panel .route-strip small { color: rgba(222,255,234,.72); }
+
+.assistant-glass-panel .assistant-conversation {
+  min-height: 250px;
+  flex: 1;
+  padding: 18px 20px 10px;
+  background: rgba(2, 15, 32, .12);
+  overscroll-behavior: contain;
+}
+
+.assistant-glass-panel .chat-message__body { max-width: 92%; }
+.assistant-glass-panel .chat-message > span { background: linear-gradient(145deg, #2596ff, #6c54ff); }
+.assistant-glass-panel .chat-message p {
+  color: #f7fbff;
+  background: rgba(255,255,255,.1);
+  border-color: rgba(255,255,255,.2);
+  border-radius: 6px 18px 18px 18px;
+  font-size: 14px;
+}
+.assistant-glass-panel .chat-message__body small { color: rgba(226,242,255,.75); }
+.assistant-glass-panel .chat-message--user p { background: rgba(0,94,168,.82); border-color: rgba(109,195,255,.55); border-radius: 18px 6px 18px 18px; }
+
+.requested-facts {
+  margin-top: 9px;
+  padding: 12px;
+  color: #eefdff;
+  background: rgba(73, 174, 255, .1);
+  border: 1px solid rgba(127,213,255,.27);
+  border-radius: 14px;
+}
+.requested-facts__top { display: flex; align-items: center; gap: 8px; }
+.requested-facts__top > svg { width: 18px; color: #8fe4ff; }
+.requested-facts__top span { font-size: 10px; color: rgba(226,245,255,.76); }
+.requested-facts__top strong { display: block; margin-bottom: 2px; color: #fff; font-size: 11px; letter-spacing: .1em; }
+.requested-facts__groups { margin: 10px 0 8px; display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 7px; }
+.requested-facts__groups > div { padding: 8px 9px; background: rgba(255,255,255,.08); border-radius: 9px; }
+.requested-facts__groups strong { display: block; margin-bottom: 3px; color: #99e6ff; font-size: 10px; text-transform: capitalize; }
+.requested-facts__groups span { display: block; color: rgba(246,251,255,.82); font-size: 9px; line-height: 1.45; }
+.requested-facts > small { display: block; color: rgba(235,247,255,.62); font-size: 9px; }
+
+.assistant-glass-panel .assistant-intro-actions { margin-left: 34px; }
+.assistant-glass-panel .assistant-intro-actions button { color: #fff; background: rgba(255,255,255,.08); border-color: rgba(126,210,255,.55); border-radius: 12px; }
+.assistant-glass-panel .assistant-intro-actions .assistant-primary { background: linear-gradient(90deg, #087fd2, #6659e8); }
+.assistant-glass-panel .assistant-intro-actions small { color: rgba(235,247,255,.65); }
+
+.assistant-glass-panel .assistant-working { color: #e9fff2; background: rgba(44,180,102,.15); border-color: #64d990; border-radius: 0 12px 12px 0; }
+.assistant-glass-panel .assistant-working span { color: rgba(224,255,236,.72); }
+.assistant-glass-panel .assistant-work-steps span { color: rgba(238,250,255,.72); background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.16); }
+
+.assistant-glass-panel .assistant-composer {
+  padding: 14px 18px 10px;
+  background: rgba(0, 13, 31, .28);
+  border-color: rgba(255,255,255,.16);
+}
+.assistant-glass-panel .assistant-composer > div:first-child { grid-template-columns: 60px minmax(0,1fr) 76px; gap: 11px; }
+.assistant-glass-panel .assistant-composer textarea {
+  min-height: 132px;
+  max-height: 260px;
+  padding: 13px 14px;
+  color: #fff;
+  background: rgba(255,255,255,.1);
+  border: 1px solid rgba(166,222,255,.45);
+  border-radius: 16px;
+  resize: none;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.assistant-glass-panel .assistant-composer textarea::placeholder { color: rgba(228,242,255,.56); }
+.assistant-glass-panel .voice-button { width: 60px; height: 60px; align-self: end; background: radial-gradient(circle at 35% 30%, #6fdbff, #2769e6 55%, #6245dc); box-shadow: 0 0 22px rgba(62,147,255,.38); }
+.assistant-glass-panel .voice-button--listening { background: radial-gradient(circle at 35% 30%, #ff9fae, #e31c3d 58%, #89091f); }
+.assistant-glass-panel .send-button { height: 54px; align-self: end; border-radius: 15px; background: linear-gradient(135deg, #0c8dd9, #6559e8); }
+.transcript-meta { margin: 8px 88px 0 71px; display: flex !important; align-items: center; justify-content: space-between; color: rgba(226,242,255,.62); font-size: 9px; }
+.transcript-meta strong { color: #a9e7ff; }
+.assistant-glass-panel .voice-listening-hint { margin-left: 71px; color: #ffd8df; }
+
+.assistant-glass-panel .assistant-footer-actions { background: rgba(0,13,31,.24); border-color: rgba(255,255,255,.15); }
+.assistant-glass-panel .assistant-activity-toggle,
+.assistant-glass-panel .assistant-restart-button { color: rgba(238,248,255,.82); background: transparent; border-color: rgba(255,255,255,.15); }
+.assistant-glass-panel .assistant-activity { color: #1b1b1b; }
+
+@media (max-width: 680px) {
+  .adaptive-assistant { inset: 0; width: auto; max-height: none; padding: 7px; }
+  .assistant-glass-panel { width: 100%; max-height: calc(100vh - 14px); border-radius: 20px; }
+  .assistant-glass-panel .assistant-header { min-height: 72px; padding: 10px 12px; }
+  .assistant-orb { width: 46px; height: 46px; }
+  .assistant-glass-panel .assistant-conversation { padding: 13px 11px 8px; }
+  .assistant-glass-panel .chat-message__body { max-width: 96%; }
+  .requested-facts__groups { grid-template-columns: 1fr; }
+  .assistant-glass-panel .assistant-composer { padding: 10px; }
+  .assistant-glass-panel .assistant-composer > div:first-child { grid-template-columns: 52px minmax(0,1fr); }
+  .assistant-glass-panel .voice-button { width: 52px; height: 52px; }
+  .assistant-glass-panel .send-button { grid-column: 2; height: 44px; }
+  .transcript-meta { margin: 7px 2px 0; gap: 8px; }
+  .assistant-glass-panel .voice-listening-hint { margin-left: 2px; }
+}

@@ -709,7 +709,7 @@ export function createVisaApplicationTools(runtime: ToolRuntime): WebMcpToolDefi
           answers: {
             type: 'array',
             minItems: 1,
-            maxItems: 12,
+            maxItems: 30,
             items: {
               type: 'object',
               properties: {
@@ -738,8 +738,8 @@ export function createVisaApplicationTools(runtime: ToolRuntime): WebMcpToolDefi
         if (!['user_statement', 'document'].includes(source)) {
           errors.push('source must be user_statement or document.')
         }
-        if (!rawAnswers.length || rawAnswers.length > 12) {
-          errors.push('answers must contain between 1 and 12 facts.')
+        if (!rawAnswers.length || rawAnswers.length > 30) {
+          errors.push('answers must contain between 1 and 30 facts.')
         }
 
         for (const rawAnswer of rawAnswers) {

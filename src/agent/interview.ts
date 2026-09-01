@@ -25,6 +25,7 @@ export interface InterviewTurnPlan {
   }
   updates: InterviewUpdate[]
   confirm_question_ids: string[]
+  requested_question_ids: string[]
   next_question_id: string | null
   next_question: string | null
   is_complete: boolean
@@ -86,16 +87,4 @@ export function buildInterviewRequest(
       .filter(([, answer]) => answer.verificationStatus === 'needs_confirmation')
       .map(([questionId]) => questionId),
   }
-}
-
-export function suggestionForQuestion(questionId: string | null) {
-  const suggestions: Record<string, string> = {
-    travel_purpose: 'Tourism in New York from October 12 to October 21, 2026',
-    funding: 'I will pay myself. I work at Northstar Labs as a product designer',
-    current_employer: 'I work at Northstar Labs as a product designer',
-    prior_visits: 'I visited in 2024, I have never had a refusal, and I have no dependants',
-    passport_scan: 'I have a passport scan and bank statement ready',
-    review_name_match: 'Yes, I reviewed everything and explicitly confirm all five declarations and sensitive answers',
-  }
-  return questionId ? suggestions[questionId] ?? '' : ''
 }
