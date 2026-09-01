@@ -48,6 +48,7 @@ const dateField = (description: string) => ({
   description: `${description} in YYYY-MM-DD format.`,
 })
 const yesNoField = (description: string) => ({ type: 'string', enum: ['Yes', 'No'], description })
+const questionIdValues = questions.map((question) => question.id)
 
 function schemaFor(
   fields: Record<string, Record<string, unknown>>,
@@ -694,6 +695,168 @@ export function createVisaApplicationTools(runtime: ToolRuntime): WebMcpToolDefi
       }),
     },
     {
+      name: 'provide_interview_answers',
+      title: 'Apply adaptive interview answers',
+      description: 'Apply one or more facts explicitly stated during the adaptive interview. The website validates field IDs, dates, enumerated choices, applicability, provenance, and sensitive confirmation status before writing anything.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          source: {
+            type: 'string',
+            enum: ['user_statement', 'document'],
+            description: 'Use user_statement for spoken or typed facts and document only for a fictional evidence reference the user explicitly approved.',
+          },
+          answers: {
+            type: 'array',
+            minItems: 1,
+            maxItems: 12,
+            items: {
+              type: 'object',
+              properties: {
+                question_id: { type: 'string', enum: questionIdValues },
+                value: { type: 'string', minLength: 1, maxLength: 500 },
+                confidence: confidenceSchema,
+              },
+              required: ['question_id', 'value', 'confidence'],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ['source', 'answers'],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, untrustedContentHint: true },
+      execute: (input) => {
+        const args = asRecord(input)
+        const source = typeof args.source === 'string' ? args.source : ''
+        const rawAnswers = Array.isArray(args.answers) ? args.answers : []
+        const state = runtime.getState()
+        const applicable = new Set(state.flow?.applicableQuestionIds ?? questionIdValues)
+        const errors: string[] = []
+        const entries: AgentAnswerInput[] = []
+
+        if (!['user_statement', 'document'].includes(source)) {
+          errors.push('source must be user_statement or document.')
+        }
+        if (!rawAnswers.length || rawAnswers.length > 12) {
+          errors.push('answers must contain between 1 and 12 facts.')
+        }
+
+        for (const rawAnswer of rawAnswers) {
+          const answer = asRecord(rawAnswer)
+          const questionId = typeof answer.question_id === 'string' ? answer.question_id : ''
+          const value = typeof answer.value === 'string' ? answer.value.trim() : ''
+          const confidence = typeof answer.confidence === 'number' ? answer.confidence : 0
+          const question = questionMap.get(questionId)
+          if (!question || !applicable.has(questionId)) {
+            errors.push(`${questionId || 'Unknown field'} is not applicable to the selected path.`)
+            continue
+          }
+          if (!value || isUnknownPlaceholder(value)) {
+            errors.push(`${questionId} must contain an explicitly known value.`)
+            continue
+          }
+          if (confidence < 0.7 || confidence > 1) {
+            errors.push(`${questionId} confidence must be between 0.7 and 1.`)
+            continue
+          }
+          if (question.type === 'date' && !isDate(value)) {
+            errors.push(`${questionId} must be a real date in YYYY-MM-DD format.`)
+            continue
+          }
+          if (question.type === 'yes-no' && !['Yes', 'No'].includes(value)) {
+            errors.push(`${questionId} must be Yes or No.`)
+            continue
+          }
+          if (question.options && !question.options.includes(value)) {
+            errors.push(`${questionId} must use one of the website's allowed choices.`)
+            continue
+          }
+          entries.push({
+            questionId,
+            value,
+            sourceLabel: source === 'document' ? 'Connected fictional evidence' : 'User statement (LLM extracted)',
+            confidence,
+          })
+        }
+
+        if (errors.length || !entries.length) {
+          return toolResponse(
+            'Interview facts were not applied because website validation failed.',
+            { ok: false, code: 'VALIDATION_ERROR', errors },
+            true,
+          )
+        }
+
+        const outcome = applyAgentAnswersToState(
+          state,
+          entries,
+          'provide_interview_answers',
+          'Adaptive interview facts applied',
+        )
+        runtime.commitState(outcome.state)
+        return toolResponse(
+          `${outcome.result.applied.length} explicitly stated interview fact${outcome.result.applied.length === 1 ? '' : 's'} passed website validation and were applied.`,
+          { ok: true, ...outcome.result, application_status: statusPayload(outcome.state) },
+        )
+      },
+    },
+    {
+      name: 'confirm_sensitive_answers',
+      title: 'Confirm sensitive answers',
+      description: 'Mark existing sensitive answers as human-confirmed only after the user explicitly confirms them during review. This cannot create or alter answer values.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          question_ids: {
+            type: 'array',
+            minItems: 1,
+            uniqueItems: true,
+            items: { type: 'string', enum: questionIdValues },
+          },
+          explicit_confirmation: { type: 'boolean', const: true },
+        },
+        required: ['question_ids', 'explicit_confirmation'],
+        additionalProperties: false,
+      },
+      annotations: { readOnlyHint: false, untrustedContentHint: false },
+      execute: (input) => {
+        const args = asRecord(input)
+        if (args.explicit_confirmation !== true || !Array.isArray(args.question_ids)) {
+          return toolResponse('Explicit human confirmation is required.', { ok: false, code: 'CONFIRMATION_REQUIRED' }, true)
+        }
+        const state = runtime.getState()
+        const answers = { ...state.answers }
+        const confirmed: string[] = []
+        const skipped: string[] = []
+        for (const rawQuestionId of args.question_ids) {
+          const questionId = typeof rawQuestionId === 'string' ? rawQuestionId : ''
+          const question = questionMap.get(questionId)
+          const existing = answers[questionId]
+          if (!question || question.sensitivity !== 'sensitive' || !existing?.value.trim()) {
+            skipped.push(questionId)
+            continue
+          }
+          answers[questionId] = { ...existing, verificationStatus: 'confirmed', lastUpdated: new Date().toISOString() }
+          confirmed.push(questionId)
+        }
+        const nextState = appendToolActivity(
+          { ...state, answers },
+          createToolActivity(
+            'confirm_sensitive_answers',
+            'Sensitive answers confirmed by the user',
+            `${confirmed.length} existing answer${confirmed.length === 1 ? '' : 's'} confirmed; no values changed`,
+            'success',
+          ),
+        )
+        runtime.commitState(nextState)
+        return toolResponse(
+          `${confirmed.length} sensitive answer${confirmed.length === 1 ? '' : 's'} marked as explicitly confirmed.`,
+          { ok: true, confirmed, skipped, application_status: statusPayload(nextState) },
+        )
+      },
+    },
+    {
       name: 'attach_evidence',
       title: 'Attach evidence reference',
       description: 'Attach a reference to fictional supporting evidence already provided by the user. This does not upload a real file or submit the application.',
@@ -760,7 +923,10 @@ export function createVisaApplicationTools(runtime: ToolRuntime): WebMcpToolDefi
       execute: () => {
         const state = runtime.getState()
         const metrics = getApplicationMetrics(state)
-        const requiredMissing = questions.filter((question) => question.required && !state.answers[question.id]?.value.trim()).length
+        const applicable = new Set(state.flow?.applicableQuestionIds ?? questionIdValues)
+        const requiredMissing = questions.filter(
+          (question) => applicable.has(question.id) && question.required && !state.answers[question.id]?.value.trim(),
+        ).length
         const blockers = {
           required_missing: requiredMissing,
           confirmations_required: metrics.needsConfirmation,

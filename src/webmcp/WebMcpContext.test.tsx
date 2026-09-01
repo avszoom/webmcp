@@ -32,6 +32,7 @@ function installExecutableModelContext() {
 
 afterEach(() => {
   cleanup()
+  vi.unstubAllGlobals()
   Object.defineProperty(document, 'modelContext', { configurable: true, value: undefined })
   window.localStorage.clear()
 })
@@ -44,8 +45,8 @@ describe('WebMcpProvider', () => {
 
     const view = render(<ApplicationProvider><WebMcpProvider><StatusProbe /></WebMcpProvider></ApplicationProvider>)
 
-    await waitFor(() => expect(screen.getByText('registered:20')).toBeInTheDocument())
-    expect(registerTool).toHaveBeenCalledTimes(20)
+    await waitFor(() => expect(screen.getByText('registered:22')).toBeInTheDocument())
+    expect(registerTool).toHaveBeenCalledTimes(22)
     expect(signals.every((signal) => !signal.aborted)).toBe(true)
     view.unmount()
     expect(signals.every((signal) => signal.aborted)).toBe(true)
@@ -65,7 +66,7 @@ describe('WebMcpProvider', () => {
     })
     render(<ApplicationProvider><WebMcpProvider><App /></WebMcpProvider></ApplicationProvider>)
 
-    await waitFor(() => expect(definitions).toHaveLength(20))
+    await waitFor(() => expect(definitions).toHaveLength(22))
     const identityTool = definitions.find((tool) => tool.name === 'provide_identity_information')!
     await act(async () => {
       await identityTool.execute({
@@ -81,9 +82,42 @@ describe('WebMcpProvider', () => {
 
   it('uses conversation answers to select a route and fill fields through WebMCP', async () => {
     const { definitions, executeTool } = installExecutableModelContext()
+    const plans = [
+      {
+        assistant_message: 'I selected the tourist path and applied your trip details.',
+        decision_summary: 'Tourism made education and extended-family questions irrelevant.',
+        route: { purpose: 'tourism', funding: null, prior_visit: null },
+        approved_profile_sections: [],
+        updates: [
+          { question_id: 'travel_purpose', value: 'Tourism', confidence: 0.99, source: 'user_statement' },
+          { question_id: 'arrival_date', value: '2026-10-12', confidence: 0.98, source: 'user_statement' },
+          { question_id: 'departure_date', value: '2026-10-21', confidence: 0.98, source: 'user_statement' },
+          { question_id: 'destination_city', value: 'New York', confidence: 0.99, source: 'user_statement' },
+        ],
+        confirm_question_ids: [],
+        next_question_id: 'funding',
+        next_question: 'Who will pay, and is your approved employment profile still current?',
+        is_complete: false,
+      },
+      {
+        assistant_message: 'I selected self-funding and used the employment facts you confirmed.',
+        decision_summary: 'The route now requires personal proof of funds.',
+        route: { purpose: 'tourism', funding: 'self', prior_visit: null },
+        approved_profile_sections: ['employment'],
+        updates: [],
+        confirm_question_ids: [],
+        next_question_id: 'prior_visits',
+        next_question: 'Have you visited before, had a visa refusal, or have any dependants?',
+        is_complete: false,
+      },
+    ]
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ plan: plans.shift() }), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })))
     render(<ApplicationProvider><WebMcpProvider><App /></WebMcpProvider></ApplicationProvider>)
 
-    await waitFor(() => expect(definitions).toHaveLength(20))
+    await waitFor(() => expect(definitions).toHaveLength(22))
     const assistant = await screen.findByRole('dialog', { name: 'Application assistant' }, { timeout: 1500 })
     fireEvent.click(screen.getByRole('button', { name: 'Type instead' }))
     fireEvent.click(screen.getByRole('button', { name: /Tourism in New York/ }))
@@ -91,10 +125,10 @@ describe('WebMcpProvider', () => {
     await waitFor(() => expect(assistant).toHaveTextContent('Tourist visitor'), { timeout: 2500 })
     expect(screen.getByRole('region', { name: 'Application path' })).toHaveTextContent('Tourist visitor')
     expect(executeTool.mock.calls.map(([tool]) => tool.name)).toEqual(expect.arrayContaining([
-      'select_application_flow', 'provide_travel_information', 'derive_application_insights',
+      'select_application_flow', 'provide_interview_answers', 'derive_application_insights',
     ]))
 
-    fireEvent.click(screen.getByRole('button', { name: /paying for the trip myself/ }))
+    fireEvent.click(screen.getByRole('button', { name: /pay myself/ }))
     await waitFor(() => expect(assistant).toHaveTextContent('Self-funded'), { timeout: 3000 })
     expect(screen.getByRole('region', { name: 'Application status' })).not.toHaveTextContent('0Completed')
     expect(executeTool.mock.calls.map(([tool]) => tool.name)).toEqual(expect.arrayContaining([
@@ -105,7 +139,7 @@ describe('WebMcpProvider', () => {
   it('translates the application chrome and visible travel questions', async () => {
     const { definitions } = installExecutableModelContext()
     render(<ApplicationProvider><WebMcpProvider><App /></WebMcpProvider></ApplicationProvider>)
-    await waitFor(() => expect(definitions).toHaveLength(20))
+    await waitFor(() => expect(definitions).toHaveLength(22))
 
     fireEvent.change(screen.getByLabelText('Language'), { target: { value: 'es' } })
     expect(screen.getByText('Solicitud de visa de no inmigrante en línea', { selector: '.topbar-title' })).toBeInTheDocument()

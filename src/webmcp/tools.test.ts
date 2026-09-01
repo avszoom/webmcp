@@ -22,9 +22,9 @@ function createHarness(initialState?: ApplicationState) {
 }
 
 describe('WebMCP semantic tool registry', () => {
-  it('exposes 20 semantic tools with typed schemas', () => {
+  it('exposes 22 semantic tools with typed schemas', () => {
     const { tools } = createHarness()
-    expect(tools).toHaveLength(20)
+    expect(tools).toHaveLength(22)
     expect(tools.map((tool) => tool.name)).toEqual(expect.arrayContaining([
       'inspect_application_flows',
       'select_application_flow',
@@ -36,6 +36,8 @@ describe('WebMCP semantic tool registry', () => {
       'provide_address_history',
       'provide_employment_history',
       'provide_travel_information',
+      'provide_interview_answers',
+      'confirm_sensitive_answers',
       'derive_application_insights',
       'request_review',
     ]))
@@ -157,5 +159,28 @@ describe('WebMCP semantic tool registry', () => {
 
     expect(harness.getState().answers.email.value).toBe('human@example.com')
     expect(harness.getState().conflicts).toHaveLength(1)
+  })
+
+  it('validates adaptive interview facts and requires explicit sensitive confirmation', async () => {
+    const harness = createHarness()
+    await harness.execute('select_application_flow', {
+      purpose: 'tourism', funding: 'self', prior_visit: 'no',
+    })
+    const applied = await harness.execute('provide_interview_answers', {
+      source: 'user_statement',
+      answers: [
+        { question_id: 'destination_city', value: 'New York', confidence: 0.98 },
+        { question_id: 'prior_refusal', value: 'No', confidence: 0.99 },
+      ],
+    }) as { isError?: boolean }
+
+    expect(applied.isError).not.toBe(true)
+    expect(harness.getState().answers.destination_city.verificationStatus).toBe('confirmed')
+    expect(harness.getState().answers.prior_refusal.verificationStatus).toBe('needs_confirmation')
+
+    await harness.execute('confirm_sensitive_answers', {
+      question_ids: ['prior_refusal'], explicit_confirmation: true,
+    })
+    expect(harness.getState().answers.prior_refusal.verificationStatus).toBe('confirmed')
   })
 })

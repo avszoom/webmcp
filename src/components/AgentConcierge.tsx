@@ -107,7 +107,7 @@ export function AgentConcierge() {
       ? approvedProfileDemoCalls
       : createPersonalConciergeCalls(interview)
     setStage('running')
-    void webMcp.runPrefillPlan(calls)
+    void webMcp.runPrefillPlan(calls).catch(() => {})
   }
 
   const close = () => {

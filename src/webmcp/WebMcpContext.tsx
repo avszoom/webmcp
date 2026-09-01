@@ -130,6 +130,7 @@ export function WebMcpProvider({ children }: { children: ReactNode }) {
     } catch (runError) {
       setPrefillError(runError instanceof Error ? runError.message : 'The agent prefill could not finish.')
       setPrefillStatus('error')
+      throw runError
     }
   }, [status, tools])
 

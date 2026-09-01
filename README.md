@@ -11,8 +11,8 @@ tools instead of UI navigation.
 ## Product experience
 
 - A deliberately long 55-question application across 10 sections
-- An assistant that opens with the form and accepts voice or text answers
-- Adaptive follow-up questions based on purpose, funding, employment, and travel history
+- A GPT-5.6 Luna assistant that opens with the form and accepts voice or text answers
+- Live LLM extraction and follow-up planning based on the current application state
 - Live route selection for tourist, business, and family-visit applicants
 - Application sections and evidence requirements that change with the selected path
 - Rapid semantic filling from an approved fictional personal profile
@@ -23,7 +23,7 @@ tools instead of UI navigation.
 ## Why WebMCP matters
 
 The personal agent knows the user; the website knows its conditional rules. WebMCP connects
-those knowledge sets through 20 discoverable semantic tools. Four tools specifically expose
+those knowledge sets through 22 discoverable semantic tools. Four tools specifically expose
 the routing intelligence:
 
 - `inspect_application_flows`
@@ -32,7 +32,8 @@ the routing intelligence:
 - `simulate_flow_change`
 
 The remaining tools expose status, requirements, approved facts, safe section-level writes,
-derived insights, evidence references, conflict handling, and review readiness. The agent can
+validated interview batches, explicit sensitive confirmation, derived insights, evidence
+references, conflict handling, and review readiness. The agent can
 select a route and apply structured answers without relying on DOM selectors or clicking
 through conditional pages.
 
@@ -40,11 +41,11 @@ through conditional pages.
 
 1. Open the application and choose **Type instead** or **Start with voice**.
 2. Say: “Tourism in New York, October 12 to October 21, 2026.”
-3. Say: “I am paying for the trip myself.”
-4. Confirm the approved employment fact.
-5. Answer the two travel-history questions.
-6. Open **How this was completed** to inspect the semantic actions.
-7. Change the interface language from the header to see the application and assistant adapt.
+3. Answer the agent's bundled funding and employment question.
+4. Answer its adaptive travel-history and remaining-facts question.
+5. Approve the fictional evidence references and complete the explicit final review.
+6. Open **Agent decisions & WebMCP actions** to inspect the semantic actions.
+7. Change the interface language from the header to see both the form and LLM interview adapt.
 
 ## Run locally
 
@@ -53,9 +54,10 @@ npm install
 npm run dev
 ```
 
-Use a WebMCP-capable in-app browser or enable WebMCP testing in Chrome. The same semantic
-handlers remain available as a local compatibility fallback so the conversational experience
-can still be reviewed in other browsers.
+Use a WebMCP-capable in-app browser or enable WebMCP testing in Chrome. The hosted application
+uses a server-side `OPENAI_API_KEY` secret; never put this value in browser code or commit it.
+The semantic handlers remain available as a compatibility fallback in browsers without native
+WebMCP support.
 
 ## Verify
 
