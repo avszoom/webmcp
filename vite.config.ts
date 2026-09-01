@@ -1,0 +1,11 @@
+import react from '@vitejs/plugin-react'
+import { sites } from '@openai/sites-vite-plugin'
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  plugins: [react(), sites()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.ts',
+  },
+})
