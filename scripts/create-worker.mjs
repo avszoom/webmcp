@@ -95,7 +95,7 @@ assistant_message must be one short, warm acknowledgement and must not repeat th
 
 const worker = `const INTERVIEW_SCHEMA = ${JSON.stringify(interviewSchema)};
 const SYSTEM_PROMPT = ${JSON.stringify(systemPrompt)};
-const MODEL = 'gpt-5.6-luna';
+const MODEL = 'gpt-5.6-terra';
 const rateWindows = new Map();
 
 function json(data, status = 200, headers = {}) {
@@ -178,7 +178,7 @@ async function planInterview(request, env) {
       },
       body: JSON.stringify({
         model: MODEL,
-        reasoning: { effort: 'low' },
+        reasoning: { effort: 'medium' },
         instructions: SYSTEM_PROMPT,
         input: JSON.stringify(payload),
         text: {
