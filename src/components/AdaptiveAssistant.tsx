@@ -81,10 +81,6 @@ const content = {
 
 const questionMap = new Map(questions.map((question) => [question.id, question]))
 
-function assistantText(plan: InterviewTurnPlan) {
-  return plan.next_question ?? plan.assistant_message
-}
-
 export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRestart: () => void }) {
   const { state, metrics } = useApplication()
   const webMcp = useWebMcp()
@@ -99,6 +95,8 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   const [activityOpen, setActivityOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [lastQuestion, setLastQuestion] = useState<string>(copy.trip)
+  const [currentQuestion, setCurrentQuestion] = useState<string>(copy.trip)
+  const [currentQuestionIds, setCurrentQuestionIds] = useState<string[]>(initialFastIntakeIds)
   const [turnNumber, setTurnNumber] = useState(0)
   const [plannerError, setPlannerError] = useState<string | null>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
@@ -266,8 +264,10 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
 
       await runCalls(calls)
       setTurnNumber((current) => current + 1)
-      addMessage('agent', assistantText(plan), plan.decision_summary, progress, plan.requested_question_ids)
+      addMessage('agent', plan.assistant_message, plan.decision_summary, progress)
       setLastQuestion(plan.next_question ?? '')
+      setCurrentQuestion(plan.next_question ?? '')
+      setCurrentQuestionIds(plan.requested_question_ids ?? [])
       if (plan.is_complete) {
         stageRef.current = 'complete'
         setStage('complete')
@@ -287,7 +287,8 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
     setStage('interview')
     const requestedLabels = initialFastIntakeIds.map((id) => questionMap.get(id)?.label ?? id)
     setLastQuestion(`${copy.trip} Requested fields: ${requestedLabels.join(', ')}`)
-    addMessage('agent', copy.trip, undefined, undefined, initialFastIntakeIds)
+    setCurrentQuestion(copy.trip)
+    setCurrentQuestionIds(initialFastIntakeIds)
     if (withVoice) window.setTimeout(startListening, 300)
   }
 
@@ -379,9 +380,6 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
             {message.role === 'agent' && <span><BotIcon /></span>}
             <div className="chat-message__body">
               <p>{message.text}</p>
-              {message.requestedQuestionIds && message.requestedQuestionIds.length > 0 && (
-                <RequestedFactsCard locale={locale} questionIds={message.requestedQuestionIds} />
-              )}
               {message.detail && <small><SparkleIcon /> {message.detail}</small>}
               {message.progress && <TurnProgressCard progress={message.progress} />}
             </div>
@@ -415,6 +413,10 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
           </div>
         )}
       </div>
+
+      {stage === 'interview' && currentQuestion && (
+        <CurrentQuestionCard locale={locale} question={currentQuestion} questionIds={currentQuestionIds} />
+      )}
 
       {stage === 'interview' && (
         <div className="assistant-composer">
@@ -451,7 +453,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   )
 }
 
-function RequestedFactsCard({ locale, questionIds }: { locale: Locale; questionIds: string[] }) {
+function CurrentQuestionCard({ locale, question, questionIds }: { locale: Locale; question: string; questionIds: string[] }) {
   const groups = new Map<string, number>()
   for (const questionId of questionIds) {
     const question = questionMap.get(questionId)
@@ -463,11 +465,11 @@ function RequestedFactsCard({ locale, questionIds }: { locale: Locale; questionI
     .map((sectionId) => sectionName(locale, sectionId as SectionId, sectionId))
 
   return (
-    <div className="requested-facts">
-      <div className="requested-facts__top"><SparkleIcon /><span><strong>ONE NATURAL ANSWER</strong>I’ll understand the story, not make you follow form order.</span></div>
-      <div className="requested-facts__story"><span>{storyAreas.join(' + ')}</span><strong>→ up to {questionIds.length} answers</strong></div>
-      <small>Mention what you know. I’ll derive only what follows safely and ask about real gaps later.</small>
-    </div>
+    <section className="assistant-next-question" aria-live="polite" aria-label="Current question">
+      <div className="assistant-next-question__label"><SparkleIcon /><span>ANSWER THIS NEXT</span></div>
+      <p>{question}</p>
+      <div className="assistant-next-question__scope"><span>{storyAreas.join(' + ')}</span><strong>One answer can resolve up to {questionIds.length} items</strong></div>
+    </section>
   )
 }
 
