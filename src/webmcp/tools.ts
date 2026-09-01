@@ -697,14 +697,14 @@ export function createVisaApplicationTools(runtime: ToolRuntime): WebMcpToolDefi
     {
       name: 'provide_interview_answers',
       title: 'Apply adaptive interview answers',
-      description: 'Apply one or more facts explicitly stated during the adaptive interview. The website validates field IDs, dates, enumerated choices, applicability, provenance, and sensitive confirmation status before writing anything.',
+      description: 'Apply one or more facts stated during the adaptive interview or explicitly approved from a visible agent proposal. The website validates field IDs, dates, enumerated choices, applicability, provenance, and sensitive confirmation status before writing anything.',
       inputSchema: {
         type: 'object',
         properties: {
           source: {
             type: 'string',
-            enum: ['user_statement', 'document'],
-            description: 'Use user_statement for spoken or typed facts and document only for a fictional evidence reference the user explicitly approved.',
+            enum: ['user_statement', 'user_confirmation', 'document'],
+            description: 'Use user_statement for spoken or typed facts, user_confirmation only after the user approves a visible candidate, and document only for a fictional evidence reference the user explicitly approved.',
           },
           answers: {
             type: 'array',
@@ -735,8 +735,8 @@ export function createVisaApplicationTools(runtime: ToolRuntime): WebMcpToolDefi
         const errors: string[] = []
         const entries: AgentAnswerInput[] = []
 
-        if (!['user_statement', 'document'].includes(source)) {
-          errors.push('source must be user_statement or document.')
+        if (!['user_statement', 'user_confirmation', 'document'].includes(source)) {
+          errors.push('source must be user_statement, user_confirmation, or document.')
         }
         if (!rawAnswers.length || rawAnswers.length > 30) {
           errors.push('answers must contain between 1 and 30 facts.')
@@ -775,7 +775,11 @@ export function createVisaApplicationTools(runtime: ToolRuntime): WebMcpToolDefi
           entries.push({
             questionId,
             value,
-            sourceLabel: source === 'document' ? 'Connected fictional evidence' : 'User statement (LLM extracted)',
+            sourceLabel: source === 'document'
+              ? 'Connected fictional evidence'
+              : source === 'user_confirmation'
+                ? 'User-confirmed agent proposal'
+                : 'User statement (LLM extracted)',
             confidence,
           })
         }
@@ -796,7 +800,7 @@ export function createVisaApplicationTools(runtime: ToolRuntime): WebMcpToolDefi
         )
         runtime.commitState(outcome.state)
         return toolResponse(
-          `${outcome.result.applied.length} explicitly stated interview fact${outcome.result.applied.length === 1 ? '' : 's'} passed website validation and were applied.`,
+          `${outcome.result.applied.length} approved interview fact${outcome.result.applied.length === 1 ? '' : 's'} passed website validation and were applied.`,
           { ok: true, ...outcome.result, application_status: statusPayload(outcome.state) },
         )
       },

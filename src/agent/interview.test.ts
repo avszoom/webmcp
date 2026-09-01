@@ -20,6 +20,7 @@ const repeatedPlan: InterviewTurnPlan = {
   decision_summary: 'The exact address is still missing.',
   route: { purpose: 'family_visit', funding: 'self', prior_visit: null },
   updates: [],
+  candidates: [],
   partial_facts: [partialStay],
   confirm_question_ids: [],
   requested_question_ids: ['stay_address'],

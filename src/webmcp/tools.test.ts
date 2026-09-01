@@ -183,4 +183,23 @@ describe('WebMCP semantic tool registry', () => {
     })
     expect(harness.getState().answers.prior_refusal.verificationStatus).toBe('confirmed')
   })
+
+  it('records visibly approved agent proposals as user-confirmed WebMCP writes', async () => {
+    const harness = createHarness(applicationReducer(createInitialState(), { type: 'START', mode: 'personal' }))
+    await harness.execute('select_application_flow', {
+      purpose: 'family_visit', funding: 'self', prior_visit: 'yes',
+    })
+    const response = await harness.execute('provide_interview_answers', {
+      source: 'user_confirmation',
+      answers: [{ question_id: 'job_title', value: 'Software Engineer', confidence: 1 }],
+    }) as { isError?: boolean }
+
+    expect(response.isError).not.toBe(true)
+    expect(harness.getState().answers.job_title).toMatchObject({
+      value: 'Software Engineer',
+      sourceLabel: 'User-confirmed agent proposal',
+      confidence: 1,
+      verificationStatus: 'confirmed',
+    })
+  })
 })

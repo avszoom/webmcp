@@ -36,6 +36,7 @@ afterEach(() => {
   Object.defineProperty(document, 'modelContext', { configurable: true, value: undefined })
   Object.defineProperty(window, 'SpeechRecognition', { configurable: true, value: undefined })
   Object.defineProperty(window, 'webkitSpeechRecognition', { configurable: true, value: undefined })
+  Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: undefined })
   window.localStorage.clear()
 })
 
@@ -210,6 +211,62 @@ describe('WebMcpProvider', () => {
     expect(screen.queryByRole('region', { name: 'Finding the next question' })).not.toBeInTheDocument()
   })
 
+  it('keeps Terra proposals out of the form until the user confirms or corrects them', async () => {
+    const { definitions, executeTool } = installExecutableModelContext()
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
+      plan: {
+        assistant_message: 'I understood the trip and your line of work.',
+        decision_summary: 'Two direct facts were written and one normalized role is ready to verify.',
+        route: { purpose: 'family_visit', funding: 'self', prior_visit: null },
+        updates: [
+          { question_id: 'travel_purpose', value: 'Family visit', confidence: 0.99, source: 'user_statement', basis: 'explicit', evidence_text: 'visiting my brother', derivation: null },
+          { question_id: 'destination_city', value: 'New York', confidence: 0.99, source: 'user_statement', basis: 'explicit', evidence_text: 'New York', derivation: null },
+        ],
+        candidates: [{
+          question_id: 'job_title', proposed_value: 'Software Engineer', confidence: 0.86, basis: 'normalized',
+          evidence_text: 'I work in software engineering', explanation: 'Normalized the stated field of work into a likely job title.',
+          verification_prompt: 'Should I enter Software Engineer as your current job title?',
+        }],
+        partial_facts: [],
+        confirm_question_ids: [],
+        requested_question_ids: ['current_employer', 'job_title', 'employment_start'],
+        question_focus_ids: ['current_employer', 'employment_start'],
+        next_chapter: 'work_journey',
+        next_question_id: 'profile_employment',
+        next_question: 'What has your work journey looked like since you joined your current employer?',
+        is_complete: false,
+      },
+    }), { status: 200, headers: { 'content-type': 'application/json' } })))
+    render(<ApplicationProvider><WebMcpProvider><App /></WebMcpProvider></ApplicationProvider>)
+
+    await waitFor(() => expect(definitions).toHaveLength(22))
+    await screen.findByRole('dialog', { name: 'Application assistant' }, { timeout: 1500 })
+    fireEvent.click(screen.getByRole('button', { name: 'Type instead' }))
+    fireEvent.change(screen.getByPlaceholderText('Speak or type naturally…'), { target: { value: 'I am visiting my brother in New York and I work in software engineering.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    const review = await screen.findByRole('region', { name: 'Verify agent interpretations' })
+    expect(review).toHaveTextContent('Nothing below is written until you approve it')
+    const beforeConfirmation = executeTool.mock.calls
+      .filter(([tool]) => tool.name === 'provide_interview_answers')
+      .map(([, input]) => JSON.parse(input) as { source: string; answers: Array<{ question_id: string }> })
+    expect(beforeConfirmation).toHaveLength(1)
+    expect(beforeConfirmation[0].answers.map((answer) => answer.question_id)).not.toContain('job_title')
+
+    fireEvent.change(screen.getByLabelText('Proposed Job title'), { target: { value: 'Senior Software Engineer' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm 1 selected' }))
+
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Verify agent interpretations' })).not.toBeInTheDocument())
+    const afterConfirmation = executeTool.mock.calls
+      .filter(([tool]) => tool.name === 'provide_interview_answers')
+      .map(([, input]) => JSON.parse(input) as { source: string; answers: Array<{ question_id: string; value: string }> })
+    expect(afterConfirmation.at(-1)).toMatchObject({
+      source: 'user_confirmation',
+      answers: [{ question_id: 'job_title', value: 'Senior Software Engineer' }],
+    })
+    expect(screen.getByRole('region', { name: 'Current question' })).toHaveTextContent('work journey')
+  })
+
   it('keeps voice capture open through final speech until the user presses stop', async () => {
     const { definitions } = installExecutableModelContext()
     const fetchMock = vi.fn()
@@ -253,6 +310,57 @@ describe('WebMcpProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Stop voice recording' }))
     expect(instances[0].stop).toHaveBeenCalledOnce()
     expect(screen.getByRole('button', { name: 'Answer by voice' })).toBeInTheDocument()
+  })
+
+  it('speaks the question before opening the microphone for a conversational turn', async () => {
+    const { definitions } = installExecutableModelContext()
+    const recognitionInstances: MockRecognition[] = []
+    const utterances: MockUtterance[] = []
+
+    class MockRecognition {
+      lang = ''
+      continuous = false
+      interimResults = false
+      onstart: (() => void) | null = null
+      onend: (() => void) | null = null
+      onerror: ((event: SpeechRecognitionErrorEvent) => void) | null = null
+      onresult: ((event: SpeechRecognitionResultEvent) => void) | null = null
+      start = vi.fn(() => this.onstart?.())
+      stop = vi.fn(() => this.onend?.())
+      abort = vi.fn()
+      constructor() { recognitionInstances.push(this) }
+    }
+    class MockUtterance {
+      lang = ''
+      rate = 1
+      pitch = 1
+      voice: SpeechSynthesisVoice | null = null
+      onstart: (() => void) | null = null
+      onend: (() => void) | null = null
+      onerror: (() => void) | null = null
+      constructor(public text: string) { utterances.push(this) }
+    }
+    const synthesis = {
+      cancel: vi.fn(),
+      getVoices: vi.fn(() => []),
+      speak: vi.fn((utterance: MockUtterance) => utterance.onstart?.()),
+    }
+    Object.defineProperty(window, 'SpeechRecognition', { configurable: true, value: MockRecognition })
+    Object.defineProperty(window, 'speechSynthesis', { configurable: true, value: synthesis })
+    vi.stubGlobal('SpeechSynthesisUtterance', MockUtterance)
+
+    render(<ApplicationProvider><WebMcpProvider><App /></WebMcpProvider></ApplicationProvider>)
+    await waitFor(() => expect(definitions).toHaveLength(22))
+    await screen.findByRole('dialog', { name: 'Application assistant' }, { timeout: 1500 })
+    fireEvent.click(screen.getByRole('button', { name: /Start with voice/ }))
+
+    await waitFor(() => expect(synthesis.speak).toHaveBeenCalledOnce())
+    expect(utterances[0].text).toContain('telling a friend about this trip')
+    expect(recognitionInstances).toHaveLength(0)
+    act(() => utterances[0].onend?.())
+    await waitFor(() => expect(recognitionInstances).toHaveLength(1))
+    expect(screen.getByRole('button', { name: 'Mute agent voice' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Stop voice recording' })).toBeInTheDocument()
   })
 
   it('translates the application chrome and visible travel questions', async () => {

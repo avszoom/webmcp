@@ -5,6 +5,7 @@ import {
   buildInterviewRequest,
   chooseNovelQuestion,
   mergePartialFacts,
+  type InterviewCandidate,
   type InterviewHistoryTurn,
   type InterviewPartialFact,
   type InterviewTurnPlan,
@@ -14,7 +15,7 @@ import type { PrefillToolCall } from '../webmcp/demoCalls'
 import { useApplication } from '../state/ApplicationContext'
 import { useWebMcp } from '../webmcp/WebMcpContext'
 import type { Locale } from '../i18n'
-import { BotIcon, CheckIcon, LockIcon, RefreshIcon, SparkleIcon, WarningIcon, XIcon } from './Icons'
+import { BotIcon, CheckIcon, LockIcon, RefreshIcon, SpeakerIcon, SpeakerOffIcon, SparkleIcon, WarningIcon, XIcon } from './Icons'
 
 type InterviewStage = 'intro' | 'interview' | 'complete'
 
@@ -34,6 +35,7 @@ interface TurnProgress {
   skippedFields: string[]
   inferredFields: Array<{ label: string; value: string; explanation: string }>
   rememberedFacts: Array<{ label: string; value: string; missingDetail: string }>
+  candidateFields: Array<{ label: string; value: string; explanation: string }>
   derived: Array<{ label: string; value: string }>
   completed: number
   total: number
@@ -129,6 +131,11 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   const [currentQuestionIds, setCurrentQuestionIds] = useState<string[]>(initialFastIntakeIds)
   const [interviewHistory, setInterviewHistory] = useState<InterviewHistoryTurn[]>([])
   const [partialFacts, setPartialFacts] = useState<InterviewPartialFact[]>([])
+  const [pendingCandidates, setPendingCandidates] = useState<InterviewCandidate[]>([])
+  const [candidateEdits, setCandidateEdits] = useState<Record<string, string>>({})
+  const [selectedCandidateIds, setSelectedCandidateIds] = useState<Set<string>>(new Set())
+  const [voiceEnabled, setVoiceEnabled] = useState(false)
+  const [speaking, setSpeaking] = useState(false)
   const [turnNumber, setTurnNumber] = useState(0)
   const [plannerError, setPlannerError] = useState<string | null>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
@@ -137,6 +144,9 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   const conversationRef = useRef<HTMLDivElement | null>(null)
   const transcriptRef = useRef<HTMLTextAreaElement | null>(null)
   const stageRef = useRef<InterviewStage>('intro')
+  const voiceEnabledRef = useRef(false)
+  const pendingCandidatesRef = useRef<InterviewCandidate[]>([])
+  const startListeningRef = useRef<() => void>(() => {})
   const processAnswerRef = useRef<(answer: string) => Promise<void>>(async () => {})
 
   useEffect(() => {
@@ -145,6 +155,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       window.clearTimeout(timer)
       keepListeningRef.current = false
       recognitionRef.current?.abort()
+      window.speechSynthesis?.cancel()
     }
   }, [])
 
@@ -245,13 +256,22 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         }))
       const updates = plannedUpdates.filter((update) => applicableIds.has(update.question_id))
       const skippedUpdates = plannedUpdates.filter((update) => !applicableIds.has(update.question_id))
+      const candidateMap = new Map<string, InterviewCandidate>()
+      for (const candidate of plan.candidates ?? []) {
+        if (!applicableIds.has(candidate.question_id) || updates.some((update) => update.question_id === candidate.question_id)) continue
+        if (state.answers[candidate.question_id]?.value.trim()) continue
+        const existing = candidateMap.get(candidate.question_id)
+        if (!existing || candidate.confidence > existing.confidence) candidateMap.set(candidate.question_id, candidate)
+      }
+      const candidates = [...candidateMap.values()]
       const incomingPartialFacts = (plan.partial_facts ?? [])
         .filter((fact) => applicableIds.has(fact.question_id))
         .filter((fact) => !updates.some((update) => update.question_id === fact.question_id))
+        .filter((fact) => !candidateMap.has(fact.question_id))
       const nextPartialFacts = mergePartialFacts(
         partialFacts,
         incomingPartialFacts,
-        updates.map((update) => update.question_id),
+        [...updates.map((update) => update.question_id), ...candidates.map((candidate) => candidate.question_id)],
       )
       if (updates.length) {
         calls.push({
@@ -309,6 +329,11 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
           value: fact.value,
           missingDetail: fact.missing_detail,
         })),
+        candidateFields: candidates.map((candidate) => ({
+          label: questionMap.get(candidate.question_id)?.label ?? candidate.question_id,
+          value: candidate.proposed_value,
+          explanation: candidate.explanation,
+        })),
         derived,
         completed: projectedAnswerIds.size,
         total: projectedFlow.applicableQuestionIds.length,
@@ -336,6 +361,10 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       setTurnNumber((current) => current + 1)
       setInterviewHistory(nextHistory)
       setPartialFacts(nextPartialFacts)
+      setPendingCandidates(candidates)
+      pendingCandidatesRef.current = candidates
+      setCandidateEdits(Object.fromEntries(candidates.map((candidate) => [candidate.question_id, candidate.proposed_value])))
+      setSelectedCandidateIds(new Set(candidates.map((candidate) => candidate.question_id)))
       addMessage('agent', plan.assistant_message, plan.decision_summary, progress)
       setLastQuestion(nextQuestion)
       setCurrentQuestion(nextQuestion)
@@ -346,6 +375,10 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         applicableIds.has(questionId) && !projectedAnswerIds.has(questionId),
       ))
       setCurrentChapter(plan.next_chapter ?? currentChapter)
+      const spokenTurn = candidates.length
+        ? `${plan.assistant_message} I have ${candidates.length} interpretation${candidates.length === 1 ? '' : 's'} for you to verify.`
+        : `${plan.assistant_message} ${nextQuestion}`
+      window.setTimeout(() => speakText(spokenTurn, candidates.length === 0), 120)
       if (plan.is_complete) {
         stageRef.current = 'complete'
         setStage('complete')
@@ -361,6 +394,146 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   }
   processAnswerRef.current = processAnswer
 
+  const speakText = (text: string, listenAfter = false, force = false) => {
+    const synthesis = window.speechSynthesis
+    if (!text.trim() || (!voiceEnabledRef.current && !force)) return
+    if (!synthesis || typeof SpeechSynthesisUtterance === 'undefined') {
+      if (listenAfter && voiceEnabledRef.current) window.setTimeout(() => startListeningRef.current(), 120)
+      return
+    }
+    keepListeningRef.current = false
+    recognitionRef.current?.stop()
+    synthesis.cancel()
+    const utterance = new SpeechSynthesisUtterance(text)
+    utterance.lang = speechLocales[locale]
+    utterance.rate = 0.97
+    utterance.pitch = 1.02
+    const language = speechLocales[locale].split('-')[0].toLowerCase()
+    const matchingVoice = synthesis.getVoices().find((voice) => voice.lang.toLowerCase().startsWith(language))
+    if (matchingVoice) utterance.voice = matchingVoice
+    utterance.onstart = () => setSpeaking(true)
+    utterance.onerror = () => setSpeaking(false)
+    utterance.onend = () => {
+      setSpeaking(false)
+      if (
+        listenAfter
+        && voiceEnabledRef.current
+        && stageRef.current === 'interview'
+        && pendingCandidatesRef.current.length === 0
+      ) {
+        window.setTimeout(() => startListeningRef.current(), 180)
+      }
+    }
+    synthesis.speak(utterance)
+  }
+
+  const toggleVoice = () => {
+    const next = !voiceEnabledRef.current
+    voiceEnabledRef.current = next
+    setVoiceEnabled(next)
+    if (!next) {
+      window.speechSynthesis?.cancel()
+      setSpeaking(false)
+    } else if (currentQuestion && !pendingCandidatesRef.current.length) {
+      speakText(currentQuestion, false, true)
+    }
+  }
+
+  const closeAssistant = () => {
+    keepListeningRef.current = false
+    recognitionRef.current?.stop()
+    window.speechSynthesis?.cancel()
+    setListening(false)
+    setSpeaking(false)
+    setOpen(false)
+  }
+
+  const replayCurrentQuestion = () => {
+    voiceEnabledRef.current = true
+    setVoiceEnabled(true)
+    speakText(currentQuestion, false, true)
+  }
+
+  const clearCandidateReview = () => {
+    setPendingCandidates([])
+    pendingCandidatesRef.current = []
+    setCandidateEdits({})
+    setSelectedCandidateIds(new Set())
+  }
+
+  const confirmCandidates = async () => {
+    const approved = pendingCandidates.filter((candidate) => selectedCandidateIds.has(candidate.question_id))
+    if (!approved.length || working) return
+    setWorking(true)
+    setWorkPhase('executing')
+    setWorkingLabel('Applying the interpretations you approved')
+    setPlannerError(null)
+    try {
+      const confirmedValues = approved.map((candidate) => ({
+        question_id: candidate.question_id,
+        value: (candidateEdits[candidate.question_id] ?? candidate.proposed_value).trim(),
+        confidence: 1,
+      }))
+      const calls: PrefillToolCall[] = [{
+        toolName: 'provide_interview_answers',
+        label: 'Writing your confirmed interpretations with WebMCP',
+        input: { source: 'user_confirmation', answers: confirmedValues },
+      }]
+      const sensitiveIds = approved
+        .map((candidate) => candidate.question_id)
+        .filter((questionId) => questionMap.get(questionId)?.sensitivity === 'sensitive')
+      if (sensitiveIds.length) {
+        calls.push({
+          toolName: 'confirm_sensitive_answers',
+          label: 'Recording your explicit confirmation of sensitive values',
+          input: { question_ids: sensitiveIds, explicit_confirmation: true },
+        })
+      }
+      await runCalls(calls)
+      const deferredFacts: InterviewPartialFact[] = pendingCandidates
+        .filter((candidate) => !selectedCandidateIds.has(candidate.question_id))
+        .map((candidate) => ({
+          question_id: candidate.question_id,
+          value: candidateEdits[candidate.question_id] ?? candidate.proposed_value,
+          evidence_text: candidate.evidence_text,
+          missing_detail: 'your confirmation or correction',
+          clarification_question: candidate.verification_prompt,
+        }))
+      setPartialFacts((current) => mergePartialFacts(
+        current.filter((fact) => !approved.some((candidate) => candidate.question_id === fact.question_id)),
+        deferredFacts,
+        approved.map((candidate) => candidate.question_id),
+      ))
+      clearCandidateReview()
+      addMessage(
+        'agent',
+        `${approved.length} interpretation${approved.length === 1 ? ' was' : 's were'} confirmed and applied.`,
+        'Your approval converted visible proposals into verified WebMCP writes.',
+      )
+      if (currentQuestion) window.setTimeout(() => speakText(currentQuestion, true), 120)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'The confirmed values could not be applied.'
+      setPlannerError(message)
+      addMessage('agent', `${message} Please correct the highlighted proposals and try again.`)
+    } finally {
+      setWorking(false)
+    }
+  }
+
+  const discardCandidates = () => {
+    const deferredFacts: InterviewPartialFact[] = pendingCandidates.map((candidate) => ({
+      question_id: candidate.question_id,
+      value: candidateEdits[candidate.question_id] ?? candidate.proposed_value,
+      evidence_text: candidate.evidence_text,
+      missing_detail: 'your confirmation or correction',
+      clarification_question: candidate.verification_prompt,
+    }))
+    setPartialFacts((current) => mergePartialFacts(current, deferredFacts, []))
+    clearCandidateReview()
+    addMessage('agent', 'No proposed values were written. I kept them only as unresolved notes for later.')
+    if (currentQuestion) window.setTimeout(() => speakText(currentQuestion, true), 120)
+  }
+
   const begin = (withVoice: boolean) => {
     stageRef.current = 'interview'
     setStage('interview')
@@ -371,7 +544,11 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
     setCurrentQuestionIds(initialFastIntakeIds)
     setInterviewHistory([])
     setPartialFacts([])
-    if (withVoice) window.setTimeout(startListening, 300)
+    clearCandidateReview()
+    voiceEnabledRef.current = withVoice
+    setVoiceEnabled(withVoice)
+    if (withVoice) window.setTimeout(() => speakText(copy.trip, true, true), 120)
+    else window.speechSynthesis?.cancel()
   }
 
   const startRecognitionCycle = () => {
@@ -421,12 +598,15 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       addMessage('agent', 'Voice input is unavailable in this browser. You can type the same answer below.')
       return
     }
-    if (keepListeningRef.current) return
+    if (keepListeningRef.current || pendingCandidatesRef.current.length) return
+    window.speechSynthesis?.cancel()
+    setSpeaking(false)
     committedTranscriptRef.current = draft.trim()
     keepListeningRef.current = true
     setListening(true)
     startRecognitionCycle()
   }
+  startListeningRef.current = startListening
 
   const stopListening = () => {
     keepListeningRef.current = false
@@ -444,8 +624,11 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       <div className="assistant-glass-panel">
       <header className="assistant-header">
         <span className="assistant-avatar assistant-orb"><BotIcon /></span>
-        <div><strong>Voice Application Guide</strong><span><i /> Listening, reasoning and filling with WebMCP</span></div>
-        <button onClick={() => setOpen(false)} aria-label="Close assistant"><XIcon /></button>
+        <div><strong>Voice Application Guide</strong><span><i /> {speaking ? 'Speaking now' : listening ? 'Listening until you stop' : 'Reasoning and filling with WebMCP'}</span></div>
+        <button className="assistant-voice-toggle" onClick={toggleVoice} aria-label={voiceEnabled ? 'Mute agent voice' : 'Enable agent voice'} aria-pressed={voiceEnabled} title={voiceEnabled ? 'Mute agent voice' : 'Enable agent voice'}>
+          {voiceEnabled ? <SpeakerIcon /> : <SpeakerOffIcon />}
+        </button>
+        <button onClick={closeAssistant} aria-label="Close assistant"><XIcon /></button>
       </header>
 
       {route && (
@@ -483,7 +666,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
           <div className="assistant-intro-actions">
             <button className="assistant-primary" onClick={() => begin(true)}>● {copy.startVoice}</button>
             <button onClick={() => begin(false)}>{copy.type}</button>
-            <button onClick={() => setOpen(false)}>{copy.later}</button>
+            <button onClick={closeAssistant}>{copy.later}</button>
             <small><LockIcon /> {copy.privacy}</small>
           </div>
         )}
@@ -496,13 +679,31 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         )}
       </div>
 
-      {stage === 'interview' && working && !currentQuestion && <NextQuestionLoading />}
+      {stage === 'interview' && working && !currentQuestion && !pendingCandidates.length && <NextQuestionLoading />}
 
-      {stage === 'interview' && !working && currentQuestion && (
-        <CurrentQuestionCard locale={locale} question={currentQuestion} chapter={currentChapter} />
+      {stage === 'interview' && pendingCandidates.length > 0 && (
+        <CandidateReviewCard
+          candidates={pendingCandidates}
+          edits={candidateEdits}
+          selectedIds={selectedCandidateIds}
+          working={working}
+          onEdit={(questionId, value) => setCandidateEdits((current) => ({ ...current, [questionId]: value }))}
+          onToggle={(questionId) => setSelectedCandidateIds((current) => {
+            const next = new Set(current)
+            if (next.has(questionId)) next.delete(questionId)
+            else next.add(questionId)
+            return next
+          })}
+          onConfirm={() => void confirmCandidates()}
+          onDiscard={discardCandidates}
+        />
       )}
 
-      {stage === 'interview' && (
+      {stage === 'interview' && !working && !pendingCandidates.length && currentQuestion && (
+        <CurrentQuestionCard locale={locale} question={currentQuestion} chapter={currentChapter} speaking={speaking} onReplay={replayCurrentQuestion} />
+      )}
+
+      {stage === 'interview' && !pendingCandidates.length && (
         <div className="assistant-composer">
           <div>
             <button className={`voice-button ${listening ? 'voice-button--listening' : ''}`} onClick={listening ? stopListening : startListening} aria-label={listening ? 'Stop voice recording' : 'Answer by voice'} aria-pressed={listening}>{listening ? '■' : '●'}</button>
@@ -546,10 +747,74 @@ function NextQuestionLoading() {
   )
 }
 
-function CurrentQuestionCard({ locale, question, chapter }: { locale: Locale; question: string; chapter: StoryChapter }) {
+function CandidateReviewCard({
+  candidates,
+  edits,
+  selectedIds,
+  working,
+  onEdit,
+  onToggle,
+  onConfirm,
+  onDiscard,
+}: {
+  candidates: InterviewCandidate[]
+  edits: Record<string, string>
+  selectedIds: Set<string>
+  working: boolean
+  onEdit: (questionId: string, value: string) => void
+  onToggle: (questionId: string) => void
+  onConfirm: () => void
+  onDiscard: () => void
+}) {
+  return (
+    <section className="candidate-review" aria-live="polite" aria-label="Verify agent interpretations">
+      <div className="candidate-review__heading">
+        <SparkleIcon />
+        <div><strong>VERIFY MY UNDERSTANDING</strong><span>Terra constructed these values. Nothing below is written until you approve it.</span></div>
+      </div>
+      <div className="candidate-review__list">
+        {candidates.map((candidate) => {
+          const question = questionMap.get(candidate.question_id)
+          const selected = selectedIds.has(candidate.question_id)
+          const options = question?.type === 'yes-no' ? ['Yes', 'No'] : question?.options
+          return (
+            <div className={`candidate-review__item ${selected ? 'is-selected' : ''}`} key={candidate.question_id}>
+              <input type="checkbox" checked={selected} onChange={() => onToggle(candidate.question_id)} aria-label={`Approve ${question?.label ?? candidate.question_id}`} />
+              <span className="candidate-review__copy">
+                <strong>{question?.label ?? candidate.question_id}</strong>
+                <small>{candidate.verification_prompt}</small>
+                {options ? (
+                  <select aria-label={`Proposed ${question?.label ?? candidate.question_id}`} value={edits[candidate.question_id] ?? candidate.proposed_value} onChange={(event) => onEdit(candidate.question_id, event.target.value)} disabled={!selected || working}>
+                    {options.map((option) => <option key={option} value={option}>{option}</option>)}
+                  </select>
+                ) : (
+                  <input
+                    type={question?.type === 'date' ? 'date' : 'text'}
+                    aria-label={`Proposed ${question?.label ?? candidate.question_id}`}
+                    value={edits[candidate.question_id] ?? candidate.proposed_value}
+                    onChange={(event) => onEdit(candidate.question_id, event.target.value)}
+                    disabled={!selected || working}
+                  />
+                )}
+                <em>{candidate.explanation} · {Math.round(candidate.confidence * 100)}% model confidence</em>
+              </span>
+            </div>
+          )
+        })}
+      </div>
+      <div className="candidate-review__actions">
+        <button onClick={onConfirm} disabled={working || selectedIds.size === 0}><CheckIcon /> {working ? 'Applying…' : `Confirm ${selectedIds.size} selected`}</button>
+        <button onClick={onDiscard} disabled={working}>None are correct</button>
+      </div>
+      <small className="candidate-review__trust"><LockIcon /> Visible approval turns proposals into validated WebMCP writes.</small>
+    </section>
+  )
+}
+
+function CurrentQuestionCard({ locale, question, chapter, speaking, onReplay }: { locale: Locale; question: string; chapter: StoryChapter; speaking: boolean; onReplay: () => void }) {
   return (
     <section className="assistant-next-question" aria-live="polite" aria-label="Current question">
-      <div className="assistant-next-question__label"><SparkleIcon /><span>{storyChapterLabels[locale][chapter]}</span><em>ANSWER THIS NEXT</em></div>
+      <div className="assistant-next-question__label"><SparkleIcon /><span>{storyChapterLabels[locale][chapter]}</span><button onClick={onReplay} aria-label="Replay current question"><SpeakerIcon /> {speaking ? 'SPEAKING' : 'REPLAY'}</button><em>ANSWER THIS NEXT</em></div>
       <p>{question}</p>
       <div className="assistant-next-question__scope"><span>Tell it naturally—I’ll connect the details and ask only about real gaps.</span></div>
     </section>
@@ -566,7 +831,8 @@ function TurnProgressCard({ progress }: { progress: TurnProgress }) {
       {progress.skippedFields.length > 0 && <div className="turn-progress__skipped"><CheckIcon /><span><strong>{progress.skippedFields.length} details no longer needed</strong>{progress.skippedFields.slice(0, 3).join(' · ')} were excluded after the route changed</span></div>}
       <div className="turn-progress__route"><CheckIcon /><span><strong>{progress.fields.length ? `${progress.fields.length} verified field${progress.fields.length === 1 ? '' : 's'} filled` : 'No unverified fields added'}</strong>{progress.fields.length ? progress.fields.slice(0, 4).join(' · ') : 'Waiting for an explicit answer'}</span></div>
       {progress.inferredFields.slice(0, 3).map((field) => <div className="turn-progress__inferred" key={field.label}><SparkleIcon /><span><strong>{field.label}: {field.value}</strong>{field.explanation} · reviewable</span></div>)}
-      {progress.rememberedFacts.length > 0 && <div className="turn-progress__remembered"><SparkleIcon /><span><strong>{progress.rememberedFacts.length} incomplete detail${progress.rememberedFacts.length === 1 ? '' : 's'} remembered</strong>{progress.rememberedFacts.slice(0, 3).map((fact) => `${fact.label}: ${fact.value} (${fact.missingDetail})`).join(' · ')}</span></div>}
+      {progress.candidateFields.length > 0 && <div className="turn-progress__candidates"><SparkleIcon /><span><strong>{`${progress.candidateFields.length} interpretation${progress.candidateFields.length === 1 ? '' : 's'} ready to verify`}</strong>{progress.candidateFields.slice(0, 3).map((field) => `${field.label}: ${field.value}`).join(' · ')}</span></div>}
+      {progress.rememberedFacts.length > 0 && <div className="turn-progress__remembered"><SparkleIcon /><span><strong>{`${progress.rememberedFacts.length} incomplete detail${progress.rememberedFacts.length === 1 ? '' : 's'} remembered`}</strong>{progress.rememberedFacts.slice(0, 3).map((fact) => `${fact.label}: ${fact.value} (${fact.missingDetail})`).join(' · ')}</span></div>}
       {progress.derived.slice(0, 2).map((insight) => <div className="turn-progress__derived" key={insight.label}><SparkleIcon /><span><strong>{insight.value}</strong>{insight.label} · derived from stated facts</span></div>)}
       <div className="turn-progress__trust"><LockIcon /> Stated and derived values stay visibly separate · {progress.actions} WebMCP actions</div>
     </div>

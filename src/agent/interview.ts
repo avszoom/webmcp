@@ -26,6 +26,16 @@ export interface InterviewPartialFact {
   clarification_question: string
 }
 
+export interface InterviewCandidate {
+  question_id: string
+  proposed_value: string
+  confidence: number
+  basis: 'normalized' | 'derived' | 'speech_repair'
+  evidence_text: string
+  explanation: string
+  verification_prompt: string
+}
+
 export interface InterviewHistoryTurn {
   question: string
   answer: string
@@ -43,6 +53,7 @@ export interface InterviewTurnPlan {
     prior_visit: Exclude<PriorVisitStatus, 'undetermined'> | null
   }
   updates: InterviewUpdate[]
+  candidates: InterviewCandidate[]
   partial_facts: InterviewPartialFact[]
   confirm_question_ids: string[]
   requested_question_ids: string[]

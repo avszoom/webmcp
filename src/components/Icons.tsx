@@ -54,6 +54,14 @@ export const SparkleIcon = (props: IconProps) => (
   <svg {...baseProps} {...props}><path d="m12 3 1.4 4.1L17.5 8.5l-4.1 1.4L12 14l-1.4-4.1-4.1-1.4 4.1-1.4zM18.5 14l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z" /></svg>
 )
 
+export const SpeakerIcon = (props: IconProps) => (
+  <svg {...baseProps} {...props}><path d="M5 9v6h4l5 4V5L9 9z" /><path d="M17 9a4 4 0 0 1 0 6M19.5 6.5a8 8 0 0 1 0 11" /></svg>
+)
+
+export const SpeakerOffIcon = (props: IconProps) => (
+  <svg {...baseProps} {...props}><path d="M5 9v6h4l5 4V5L9 9zM18 9l4 4M22 9l-4 4" /></svg>
+)
+
 export const UserIcon = (props: IconProps) => (
   <svg {...baseProps} {...props}><circle cx="12" cy="8" r="4" /><path d="M4.5 21a7.5 7.5 0 0 1 15 0" /></svg>
 )
