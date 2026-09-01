@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { buildApplicationFlow } from '../agent/applicationFlow'
+import { deriveInsightsFromValues } from '../agent/derivations'
 import {
   buildInterviewRequest,
-  suggestionForQuestion,
-  type ApprovedProfileSection,
   type InterviewTurnPlan,
 } from '../agent/interview'
-import { approvedProfileDemoCalls, type PrefillToolCall } from '../webmcp/demoCalls'
+import { questions } from '../data/questions'
+import type { PrefillToolCall } from '../webmcp/demoCalls'
 import { useApplication } from '../state/ApplicationContext'
 import { useWebMcp } from '../webmcp/WebMcpContext'
 import type { Locale } from '../i18n'
@@ -19,7 +19,20 @@ interface ChatMessage {
   role: 'agent' | 'user'
   text: string
   detail?: string
+  progress?: TurnProgress
 }
+
+interface TurnProgress {
+  route: string
+  fields: string[]
+  derived: Array<{ label: string; value: string }>
+  completed: number
+  total: number
+  removed: number
+  actions: number
+}
+
+type WorkPhase = 'understanding' | 'executing'
 
 const speechLocales: Record<Locale, string> = {
   en: 'en-US', es: 'es-US', fr: 'fr-FR', hi: 'hi-IN',
@@ -27,11 +40,12 @@ const speechLocales: Record<Locale, string> = {
 
 const content = {
   en: {
-    greeting: 'This application is deliberately long, but we can finish the applicable path together. Tell me about your trip in your own words; I’ll decide what matters next, use approved profile facts, and explain every WebMCP action.',
+    greeting: 'This application is deliberately long, but we can finish the applicable path together. I only use facts you state, remove questions that do not apply, and show every WebMCP action.',
     privacy: 'Your answer is sent to OpenAI for planning. The API key stays server-side, every value is validated by this website, and nothing is submitted.',
     startVoice: 'Start with voice', type: 'Type instead', later: 'Not now',
     trip: 'Start anywhere: why are you visiting the United States, where will you stay, and what dates are you considering?',
-    placeholder: 'Speak or type naturally…', send: 'Send', listening: 'Listening…',
+    placeholder: 'Speak or type naturally…', send: 'Send', listening: 'Listening through pauses…',
+    listeningHint: 'Take your time. Click the red square when you are finished, then review and send.',
     activity: 'Agent decisions & WebMCP actions', routePending: 'Route not selected', restart: 'Start over',
   },
   es: {
@@ -39,39 +53,28 @@ const content = {
     privacy: 'Su respuesta se envía a OpenAI para planificar. La clave permanece en el servidor, este sitio valida cada valor y no se envía ninguna solicitud.',
     startVoice: 'Comenzar por voz', type: 'Escribir', later: 'Ahora no',
     trip: 'Empiece donde quiera: ¿por qué visita Estados Unidos, dónde se alojará y qué fechas considera?',
-    placeholder: 'Hable o escriba naturalmente…', send: 'Enviar', listening: 'Escuchando…', activity: 'Decisiones y acciones WebMCP', routePending: 'Ruta sin seleccionar', restart: 'Empezar de nuevo',
+    placeholder: 'Hable o escriba naturalmente…', send: 'Enviar', listening: 'Escuchando durante las pausas…', listeningHint: 'Tómese su tiempo. Pulse el cuadrado rojo al terminar; luego revise y envíe.', activity: 'Decisiones y acciones WebMCP', routePending: 'Ruta sin seleccionar', restart: 'Empezar de nuevo',
   },
   fr: {
     greeting: 'Cette demande est volontairement longue, mais nous pouvons terminer ensemble le parcours applicable. Décrivez votre voyage librement ; je choisirai la prochaine question et expliquerai chaque action WebMCP.',
     privacy: 'Votre réponse est envoyée à OpenAI pour la planification. La clé reste côté serveur, ce site valide chaque valeur et rien n’est soumis.',
     startVoice: 'Commencer par la voix', type: 'Écrire', later: 'Plus tard',
     trip: 'Commencez librement : pourquoi allez-vous aux États-Unis, où séjournerez-vous et à quelles dates ?',
-    placeholder: 'Parlez ou écrivez naturellement…', send: 'Envoyer', listening: 'Écoute…', activity: 'Décisions et actions WebMCP', routePending: 'Parcours non sélectionné', restart: 'Recommencer',
+    placeholder: 'Parlez ou écrivez naturellement…', send: 'Envoyer', listening: 'Écoute maintenue pendant les pauses…', listeningHint: 'Prenez votre temps. Cliquez sur le carré rouge lorsque vous avez terminé, puis relisez et envoyez.', activity: 'Décisions et actions WebMCP', routePending: 'Parcours non sélectionné', restart: 'Recommencer',
   },
   hi: {
     greeting: 'यह आवेदन जानबूझकर लंबा है, लेकिन हम सही रास्ता साथ मिलकर पूरा कर सकते हैं। अपनी यात्रा सामान्य भाषा में बताइए; मैं अगला उपयोगी सवाल चुनूँगा और हर WebMCP कार्रवाई समझाऊँगा।',
     privacy: 'योजना बनाने के लिए आपका उत्तर OpenAI को भेजा जाता है। API कुंजी सर्वर पर रहती है, वेबसाइट हर मान जाँचती है और कुछ भी जमा नहीं होता।',
     startVoice: 'आवाज़ से शुरू करें', type: 'टाइप करें', later: 'अभी नहीं',
     trip: 'कहीं से भी शुरू करें: आप अमेरिका क्यों जा रहे हैं, कहाँ रहेंगे और कौन-सी तारीखें सोच रहे हैं?',
-    placeholder: 'स्वाभाविक रूप से बोलें या लिखें…', send: 'भेजें', listening: 'सुन रहा हूँ…', activity: 'एजेंट निर्णय और WebMCP कार्रवाई', routePending: 'रास्ता चुना नहीं गया', restart: 'फिर से शुरू करें',
+    placeholder: 'स्वाभाविक रूप से बोलें या लिखें…', send: 'भेजें', listening: 'रुकने पर भी सुन रहा हूँ…', listeningHint: 'आराम से बोलें। पूरा होने पर लाल चौकोर दबाएँ, फिर जाँचकर भेजें।', activity: 'एजेंट निर्णय और WebMCP कार्रवाई', routePending: 'रास्ता चुना नहीं गया', restart: 'फिर से शुरू करें',
   },
 } as const
 
-const profileCallBySection: Record<ApprovedProfileSection, PrefillToolCall> = {
-  identity: approvedProfileDemoCalls[0],
-  passport: approvedProfileDemoCalls[1],
-  contact: approvedProfileDemoCalls[2],
-  addresses: approvedProfileDemoCalls[3],
-  employment: approvedProfileDemoCalls[4],
-  education: approvedProfileDemoCalls[5],
-  family: approvedProfileDemoCalls[7],
-}
+const questionMap = new Map(questions.map((question) => [question.id, question]))
 
 function assistantText(plan: InterviewTurnPlan) {
-  if (!plan.next_question) return plan.assistant_message
-  return plan.assistant_message.toLowerCase().includes(plan.next_question.toLowerCase())
-    ? plan.assistant_message
-    : `${plan.assistant_message} ${plan.next_question}`
+  return plan.next_question ?? plan.assistant_message
 }
 
 export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRestart: () => void }) {
@@ -82,23 +85,28 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   const [stage, setStage] = useState<InterviewStage>('intro')
   const [draft, setDraft] = useState('')
   const [working, setWorking] = useState(false)
+  const [workPhase, setWorkPhase] = useState<WorkPhase>('understanding')
   const [workingLabel, setWorkingLabel] = useState('Understanding your answer')
   const [listening, setListening] = useState(false)
   const [activityOpen, setActivityOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [lastQuestion, setLastQuestion] = useState<string>(copy.trip)
-  const [nextQuestionId, setNextQuestionId] = useState<string | null>('travel_purpose')
   const [turnNumber, setTurnNumber] = useState(0)
   const [plannerError, setPlannerError] = useState<string | null>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
+  const keepListeningRef = useRef(false)
+  const committedTranscriptRef = useRef('')
   const conversationRef = useRef<HTMLDivElement | null>(null)
-  const appliedProfileSectionsRef = useRef<ApprovedProfileSection[]>([])
   const stageRef = useRef<InterviewStage>('intro')
   const processAnswerRef = useRef<(answer: string) => Promise<void>>(async () => {})
 
   useEffect(() => {
     const timer = window.setTimeout(() => setOpen(true), 650)
-    return () => window.clearTimeout(timer)
+    return () => {
+      window.clearTimeout(timer)
+      keepListeningRef.current = false
+      recognitionRef.current?.abort()
+    }
   }, [])
 
   useEffect(() => {
@@ -112,12 +120,13 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   const route = state.flow
   const routePreview = useMemo(() => route ?? buildApplicationFlow('undetermined'), [route])
 
-  const addMessage = (role: ChatMessage['role'], text: string, detail?: string) => {
-    setMessages((current) => [...current, { id: `${role}-${Date.now()}-${current.length}`, role, text, detail }])
+  const addMessage = (role: ChatMessage['role'], text: string, detail?: string, progress?: TurnProgress) => {
+    setMessages((current) => [...current, { id: `${role}-${Date.now()}-${current.length}`, role, text, detail, progress }])
   }
 
   const runCalls = async (calls: PrefillToolCall[]) => {
     if (!calls.length) return
+    setWorkPhase('executing')
     setWorkingLabel('Validating and applying semantic actions')
     await webMcp.runPrefillPlan(calls)
   }
@@ -129,6 +138,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
     setPlannerError(null)
     addMessage('user', answer)
     setWorking(true)
+    setWorkPhase('understanding')
     setWorkingLabel('Understanding your answer and choosing what matters next')
 
     try {
@@ -139,7 +149,6 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         turnNumber + 1,
         lastQuestion,
         answer,
-        appliedProfileSectionsRef.current,
       )
       const response = await fetch('/api/interview', {
         method: 'POST',
@@ -162,27 +171,13 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         })
       }
 
-      const proposedProfileSections = new Set(plan.approved_profile_sections)
-      if (turnNumber === 0) {
-        ;(['identity', 'passport', 'contact', 'addresses', 'family'] as ApprovedProfileSection[])
-          .forEach((section) => proposedProfileSections.add(section))
-        if (purpose === 'business') proposedProfileSections.add('education')
-      }
-      for (const section of proposedProfileSections) {
-        if (appliedProfileSectionsRef.current.includes(section)) continue
-        if (section === 'employment' && !plan.approved_profile_sections.includes('employment')) continue
-        calls.push(profileCallBySection[section])
-        appliedProfileSectionsRef.current.push(section)
-      }
-
-      for (const source of ['user_statement', 'document'] as const) {
-        const updates = plan.updates.filter((update) => update.source === source)
-        if (!updates.length) continue
+      const updates = plan.updates.filter((update) => update.source === 'user_statement')
+      if (updates.length) {
         calls.push({
           toolName: 'provide_interview_answers',
-          label: source === 'document' ? 'Attaching approved fictional evidence' : 'Applying facts extracted from your answer',
+          label: 'Applying only facts stated in your answer',
           input: {
-            source,
+            source: 'user_statement',
             answers: updates.map((update) => ({
               question_id: update.question_id,
               value: update.value,
@@ -203,11 +198,35 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         calls.push({ toolName: 'request_review', label: 'Checking readiness for human review', input: {} })
       }
 
+      const projectedFlow = purpose === 'undetermined'
+        ? (state.flow ?? buildApplicationFlow('undetermined'))
+        : buildApplicationFlow(purpose, funding, priorVisit)
+      const applicableIds = new Set(projectedFlow.applicableQuestionIds)
+      const projectedAnswerIds = new Set(
+        Object.entries(state.answers)
+          .filter(([questionId, value]) => applicableIds.has(questionId) && value.value.trim())
+          .map(([questionId]) => questionId),
+      )
+      for (const update of updates) if (applicableIds.has(update.question_id)) projectedAnswerIds.add(update.question_id)
+      const projectedValues = Object.fromEntries(
+        Object.entries(state.answers).map(([questionId, value]) => [questionId, value.value]),
+      )
+      for (const update of updates) projectedValues[update.question_id] = update.value
+      const derived = deriveInsightsFromValues(projectedValues).map(({ label, value }) => ({ label, value }))
+      const progress: TurnProgress = {
+        route: projectedFlow.labels.join(' → '),
+        fields: updates.map((update) => questionMap.get(update.question_id)?.label ?? update.question_id),
+        derived,
+        completed: projectedAnswerIds.size,
+        total: projectedFlow.applicableQuestionIds.length,
+        removed: projectedFlow.excludedQuestionIds.length,
+        actions: calls.length ? calls.length + 1 : 0,
+      }
+
       await runCalls(calls)
       setTurnNumber((current) => current + 1)
-      addMessage('agent', assistantText(plan), plan.decision_summary)
+      addMessage('agent', assistantText(plan), plan.decision_summary, progress)
       setLastQuestion(plan.next_question ?? '')
-      setNextQuestionId(plan.next_question_id)
       if (plan.is_complete) {
         stageRef.current = 'complete'
         setStage('complete')
@@ -226,9 +245,49 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
     stageRef.current = 'interview'
     setStage('interview')
     setLastQuestion(copy.trip)
-    setNextQuestionId('travel_purpose')
     addMessage('agent', copy.trip)
     if (withVoice) window.setTimeout(startListening, 300)
+  }
+
+  const startRecognitionCycle = () => {
+    const Recognition = window.SpeechRecognition ?? window.webkitSpeechRecognition
+    if (!Recognition || !keepListeningRef.current) return
+    const recognition = new Recognition()
+    recognition.lang = speechLocales[locale]
+    recognition.interimResults = true
+    recognition.continuous = true
+    recognition.onstart = () => setListening(true)
+    recognition.onresult = (event) => {
+      let interim = ''
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index]
+        const text = result[0].transcript.trim()
+        if (!text) continue
+        if (result.isFinal) {
+          committedTranscriptRef.current = `${committedTranscriptRef.current} ${text}`.trim()
+        } else {
+          interim = `${interim} ${text}`.trim()
+        }
+      }
+      setDraft(`${committedTranscriptRef.current} ${interim}`.trim())
+    }
+    recognition.onerror = (event) => {
+      if (['not-allowed', 'service-not-allowed'].includes(event.error)) {
+        keepListeningRef.current = false
+        setListening(false)
+        addMessage('agent', 'Microphone access was blocked. You can type your answer instead.')
+      }
+    }
+    recognition.onend = () => {
+      if (recognitionRef.current === recognition) recognitionRef.current = null
+      if (keepListeningRef.current) {
+        window.setTimeout(startRecognitionCycle, 150)
+      } else {
+        setListening(false)
+      }
+    }
+    recognitionRef.current = recognition
+    recognition.start()
   }
 
   const startListening = () => {
@@ -237,24 +296,19 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       addMessage('agent', 'Voice input is unavailable in this browser. You can type the same answer below.')
       return
     }
-    recognitionRef.current?.abort()
-    const recognition = new Recognition()
-    recognition.lang = speechLocales[locale]
-    recognition.interimResults = true
-    recognition.continuous = false
-    recognition.onstart = () => setListening(true)
-    recognition.onresult = (event) => {
-      const transcript = Array.from(event.results).map((result) => result[0].transcript).join(' ')
-      setDraft(transcript)
-      if (event.results[event.results.length - 1].isFinal) void processAnswerRef.current(transcript)
-    }
-    recognition.onerror = () => setListening(false)
-    recognition.onend = () => setListening(false)
-    recognitionRef.current = recognition
-    recognition.start()
+    if (keepListeningRef.current) return
+    committedTranscriptRef.current = draft.trim()
+    keepListeningRef.current = true
+    setListening(true)
+    startRecognitionCycle()
   }
 
-  const suggestion = suggestionForQuestion(nextQuestionId)
+  const stopListening = () => {
+    keepListeningRef.current = false
+    committedTranscriptRef.current = draft.trim()
+    recognitionRef.current?.stop()
+    setListening(false)
+  }
 
   if (!open) {
     return <button className="assistant-launcher" onClick={() => setOpen(true)} aria-label="Open application assistant"><BotIcon /><span>Get help</span></button>
@@ -280,11 +334,22 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         {messages.map((message) => (
           <div className={`chat-message chat-message--${message.role}`} key={message.id}>
             {message.role === 'agent' && <span><BotIcon /></span>}
-            <div className="chat-message__body"><p>{message.text}</p>{message.detail && <small><SparkleIcon /> {message.detail}</small>}</div>
+            <div className="chat-message__body">
+              <p>{message.text}</p>
+              {message.detail && <small><SparkleIcon /> {message.detail}</small>}
+              {message.progress && <TurnProgressCard progress={message.progress} />}
+            </div>
           </div>
         ))}
         {working && (
-          <div className="assistant-working"><SparkleIcon /><div><strong>{webMcp.prefillStatus === 'running' ? webMcp.prefillProgress.label : workingLabel}</strong><span>{webMcp.prefillStatus === 'running' ? `${webMcp.prefillProgress.completed} of ${webMcp.prefillProgress.total} semantic actions` : 'The model plans; the website validates and writes'}</span></div></div>
+          <div className="assistant-working">
+            <div className="assistant-working__status"><SparkleIcon /><div><strong>{webMcp.prefillStatus === 'running' ? webMcp.prefillProgress.label : workingLabel}</strong><span>{webMcp.prefillStatus === 'running' ? `${webMcp.prefillProgress.completed} of ${webMcp.prefillProgress.total} semantic actions` : 'The model plans; the website validates and writes'}</span></div></div>
+            <div className="assistant-work-steps">
+              <span className={workPhase === 'understanding' ? 'is-active' : 'is-done'}><i>1</i> Understand</span>
+              <span className={workPhase === 'executing' ? 'is-active' : ''}><i>2</i> Validate</span>
+              <span className={webMcp.prefillStatus === 'running' ? 'is-active' : ''}><i>3</i> Fill with WebMCP</span>
+            </div>
+          </div>
         )}
         {(plannerError || webMcp.prefillError) && <div className="assistant-error"><WarningIcon />{plannerError ?? webMcp.prefillError}</div>}
 
@@ -307,14 +372,14 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
 
       {stage === 'interview' && (
         <div className="assistant-composer">
-          {suggestion && <button className="answer-suggestion" onClick={() => void processAnswerRef.current(suggestion)}>Try: “{suggestion}”</button>}
           <div>
-            <button className={`voice-button ${listening ? 'voice-button--listening' : ''}`} onClick={startListening} aria-label="Answer by voice">{listening ? '■' : '●'}</button>
+            <button className={`voice-button ${listening ? 'voice-button--listening' : ''}`} onClick={listening ? stopListening : startListening} aria-label={listening ? 'Stop voice recording' : 'Answer by voice'} aria-pressed={listening}>{listening ? '■' : '●'}</button>
             <textarea value={draft} maxLength={1500} onChange={(event) => setDraft(event.target.value)} placeholder={listening ? copy.listening : copy.placeholder} rows={2} onKeyDown={(event) => {
-              if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void processAnswerRef.current(draft) }
+              if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (listening) stopListening(); void processAnswerRef.current(draft) }
             }} />
-            <button className="send-button" disabled={!draft.trim() || working} onClick={() => void processAnswerRef.current(draft)}>{copy.send}</button>
+            <button className="send-button" disabled={!draft.trim() || working || listening} onClick={() => void processAnswerRef.current(draft)}>{copy.send}</button>
           </div>
+          {listening && <div className="voice-listening-hint"><span>■</span>{copy.listeningHint}</div>}
         </div>
       )}
 
@@ -335,5 +400,19 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         </div>
       )}
     </section>
+  )
+}
+
+function TurnProgressCard({ progress }: { progress: TurnProgress }) {
+  const percentage = Math.round((progress.completed / progress.total) * 100)
+  return (
+    <div className="turn-progress">
+      <div className="turn-progress__header"><span>LIVE APPLICATION PROGRESS</span><strong>{progress.completed}/{progress.total}</strong></div>
+      <div className="turn-progress__bar"><span style={{ width: `${percentage}%` }} /></div>
+      <div className="turn-progress__route"><CheckIcon /><span><strong>{progress.route}</strong>{progress.removed} irrelevant questions removed</span></div>
+      <div className="turn-progress__route"><CheckIcon /><span><strong>{progress.fields.length ? `${progress.fields.length} verified field${progress.fields.length === 1 ? '' : 's'} filled` : 'No unverified fields added'}</strong>{progress.fields.length ? progress.fields.slice(0, 4).join(' · ') : 'Waiting for an explicit answer'}</span></div>
+      {progress.derived.slice(0, 2).map((insight) => <div className="turn-progress__derived" key={insight.label}><SparkleIcon /><span><strong>{insight.value}</strong>{insight.label} · derived from stated facts</span></div>)}
+      <div className="turn-progress__trust"><LockIcon /> Only facts from your last answer were written · {progress.actions} WebMCP actions</div>
+    </div>
   )
 }

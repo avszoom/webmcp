@@ -13,7 +13,7 @@ export const STORAGE_KEY = 'webmcp-visa-application-v1'
 
 export const createInitialState = (): ApplicationState => ({
   hasStarted: true,
-  startMode: 'demo',
+  startMode: 'personal',
   activeSectionId: 'travel',
   answers: {},
   conflicts: [],
@@ -85,7 +85,6 @@ export function applicationReducer(
       return {
         ...createInitialState(),
         hasStarted: true,
-        startMode: state.startMode,
         welcomeNoticeVisible: true,
       }
     case 'RETURN_TO_WELCOME':

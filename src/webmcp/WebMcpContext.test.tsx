@@ -34,6 +34,8 @@ afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
   Object.defineProperty(document, 'modelContext', { configurable: true, value: undefined })
+  Object.defineProperty(window, 'SpeechRecognition', { configurable: true, value: undefined })
+  Object.defineProperty(window, 'webkitSpeechRecognition', { configurable: true, value: undefined })
   window.localStorage.clear()
 })
 
@@ -70,7 +72,7 @@ describe('WebMcpProvider', () => {
     const identityTool = definitions.find((tool) => tool.name === 'provide_identity_information')!
     await act(async () => {
       await identityTool.execute({
-        source: 'approved_profile', given_names: 'Alex Jamie', family_name: 'Morgan',
+        source: 'user_statement', given_names: 'Alex Jamie', family_name: 'Morgan',
         other_names: 'None', date_of_birth: '1993-06-18', place_of_birth: 'Pune, India',
         national_id: 'DEMO-4839-2011',
       })
@@ -87,7 +89,6 @@ describe('WebMcpProvider', () => {
         assistant_message: 'I selected the tourist path and applied your trip details.',
         decision_summary: 'Tourism made education and extended-family questions irrelevant.',
         route: { purpose: 'tourism', funding: null, prior_visit: null },
-        approved_profile_sections: [],
         updates: [
           { question_id: 'travel_purpose', value: 'Tourism', confidence: 0.99, source: 'user_statement' },
           { question_id: 'arrival_date', value: '2026-10-12', confidence: 0.98, source: 'user_statement' },
@@ -96,15 +97,17 @@ describe('WebMcpProvider', () => {
         ],
         confirm_question_ids: [],
         next_question_id: 'funding',
-        next_question: 'Who will pay, and is your approved employment profile still current?',
+        next_question: 'Who will pay, and what are your employer and job title?',
         is_complete: false,
       },
       {
-        assistant_message: 'I selected self-funding and used the employment facts you confirmed.',
+        assistant_message: 'I selected self-funding and used only the facts you stated.',
         decision_summary: 'The route now requires personal proof of funds.',
         route: { purpose: 'tourism', funding: 'self', prior_visit: null },
-        approved_profile_sections: ['employment'],
-        updates: [],
+        updates: [
+          { question_id: 'current_employer', value: 'Northstar Labs', confidence: 0.98, source: 'user_statement' },
+          { question_id: 'job_title', value: 'Product Designer', confidence: 0.98, source: 'user_statement' },
+        ],
         confirm_question_ids: [],
         next_question_id: 'prior_visits',
         next_question: 'Have you visited before, had a visa refusal, or have any dependants?',
@@ -120,7 +123,8 @@ describe('WebMcpProvider', () => {
     await waitFor(() => expect(definitions).toHaveLength(22))
     const assistant = await screen.findByRole('dialog', { name: 'Application assistant' }, { timeout: 1500 })
     fireEvent.click(screen.getByRole('button', { name: 'Type instead' }))
-    fireEvent.click(screen.getByRole('button', { name: /Tourism in New York/ }))
+    fireEvent.change(screen.getByPlaceholderText('Speak or type naturally…'), { target: { value: 'Tourism in New York from October 12 to October 21, 2026' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
     await waitFor(() => expect(assistant).toHaveTextContent('Tourist visitor'), { timeout: 2500 })
     expect(screen.getByRole('region', { name: 'Application path' })).toHaveTextContent('Tourist visitor')
@@ -128,12 +132,60 @@ describe('WebMcpProvider', () => {
       'select_application_flow', 'provide_interview_answers', 'derive_application_insights',
     ]))
 
-    fireEvent.click(screen.getByRole('button', { name: /pay myself/ }))
+    fireEvent.change(screen.getByPlaceholderText('Speak or type naturally…'), { target: { value: 'I will pay myself. I work at Northstar Labs as a product designer' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     await waitFor(() => expect(assistant).toHaveTextContent('Self-funded'), { timeout: 3000 })
     expect(screen.getByRole('region', { name: 'Application status' })).not.toHaveTextContent('0Completed')
-    expect(executeTool.mock.calls.map(([tool]) => tool.name)).toEqual(expect.arrayContaining([
+    const executedTools = executeTool.mock.calls.map(([tool]) => tool.name)
+    expect(executedTools).toEqual(expect.arrayContaining(['provide_interview_answers', 'derive_application_insights']))
+    expect(executedTools).not.toEqual(expect.arrayContaining([
       'provide_identity_information', 'provide_passport_information', 'provide_contact_information', 'provide_address_history',
     ]))
+  })
+
+  it('keeps voice capture open through final speech until the user presses stop', async () => {
+    const { definitions } = installExecutableModelContext()
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    const instances: Array<{
+      continuous: boolean
+      onresult: ((event: SpeechRecognitionResultEvent) => void) | null
+      stop: ReturnType<typeof vi.fn>
+    }> = []
+
+    class MockRecognition {
+      lang = ''
+      continuous = false
+      interimResults = false
+      onstart: (() => void) | null = null
+      onend: (() => void) | null = null
+      onerror: ((event: SpeechRecognitionErrorEvent) => void) | null = null
+      onresult: ((event: SpeechRecognitionResultEvent) => void) | null = null
+      start = vi.fn(() => this.onstart?.())
+      stop = vi.fn(() => this.onend?.())
+      abort = vi.fn()
+
+      constructor() {
+        instances.push(this)
+      }
+    }
+    Object.defineProperty(window, 'SpeechRecognition', { configurable: true, value: MockRecognition })
+
+    render(<ApplicationProvider><WebMcpProvider><App /></WebMcpProvider></ApplicationProvider>)
+    await waitFor(() => expect(definitions).toHaveLength(22))
+    await screen.findByRole('dialog', { name: 'Application assistant' }, { timeout: 1500 })
+    fireEvent.click(screen.getByRole('button', { name: /Start with voice/ }))
+    await waitFor(() => expect(instances).toHaveLength(1), { timeout: 1000 })
+
+    const spokenResult = Object.assign([{ transcript: 'Tourism in New York in October' }], { isFinal: true })
+    act(() => instances[0].onresult?.({ resultIndex: 0, results: [spokenResult] } as unknown as SpeechRecognitionResultEvent))
+
+    expect(instances[0].continuous).toBe(true)
+    expect(screen.getByPlaceholderText('Listening through pauses…')).toHaveValue('Tourism in New York in October')
+    expect(fetchMock).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Stop voice recording' }))
+    expect(instances[0].stop).toHaveBeenCalledOnce()
+    expect(screen.getByRole('button', { name: 'Answer by voice' })).toBeInTheDocument()
   })
 
   it('translates the application chrome and visible travel questions', async () => {

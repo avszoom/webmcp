@@ -45,7 +45,7 @@ describe('Stage 1 application model', () => {
     })
   })
 
-  it('resets answers while preserving the chosen first-run mode', () => {
+  it('resets every session to an empty fresh-user application', () => {
     const started = applicationReducer(createInitialState(), { type: 'START', mode: 'demo' })
     const answered = applicationReducer(started, {
       type: 'SET_ANSWER',
@@ -55,7 +55,7 @@ describe('Stage 1 application model', () => {
     })
     const reset = applicationReducer(answered, { type: 'RESET_APPLICATION' })
 
-    expect(reset.startMode).toBe('demo')
+    expect(reset.startMode).toBe('personal')
     expect(reset.answers).toEqual({})
     expect(getApplicationMetrics(reset).completed).toBe(0)
   })

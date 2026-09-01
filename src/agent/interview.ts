@@ -8,20 +8,11 @@ import type {
   PriorVisitStatus,
 } from '../types'
 
-export type ApprovedProfileSection =
-  | 'identity'
-  | 'passport'
-  | 'contact'
-  | 'addresses'
-  | 'employment'
-  | 'education'
-  | 'family'
-
 export interface InterviewUpdate {
   question_id: string
   value: string
   confidence: number
-  source: 'user_statement' | 'document'
+  source: 'user_statement'
 }
 
 export interface InterviewTurnPlan {
@@ -32,7 +23,6 @@ export interface InterviewTurnPlan {
     funding: Exclude<FundingSource, 'undetermined'> | null
     prior_visit: Exclude<PriorVisitStatus, 'undetermined'> | null
   }
-  approved_profile_sections: ApprovedProfileSection[]
   updates: InterviewUpdate[]
   confirm_question_ids: string[]
   next_question_id: string | null
@@ -60,32 +50,7 @@ export interface InterviewRequest {
     evidence_required: boolean
   }>
   pending_sensitive_confirmations: string[]
-  approved_profile_sections_already_applied: ApprovedProfileSection[]
-  available_profile_sections: Array<{
-    id: ApprovedProfileSection
-    description: string
-    time_sensitive: boolean
-  }>
-  available_fictional_evidence: Array<{ question_id: string; reference: string }>
 }
-
-const profileSections: InterviewRequest['available_profile_sections'] = [
-  { id: 'identity', description: 'Six approved identity facts', time_sensitive: false },
-  { id: 'passport', description: 'Five approved passport facts', time_sensitive: false },
-  { id: 'contact', description: 'Five approved contact facts', time_sensitive: false },
-  { id: 'addresses', description: 'Five approved current-address facts', time_sensitive: false },
-  { id: 'employment', description: 'Five approved résumé facts that should be confirmed as current', time_sensitive: true },
-  { id: 'education', description: 'Four approved education facts', time_sensitive: false },
-  { id: 'family', description: 'Four approved family facts', time_sensitive: false },
-]
-
-export const fictionalEvidence = [
-  { question_id: 'passport_scan', reference: 'alex-morgan-passport-demo.pdf' },
-  { question_id: 'employment_letter', reference: 'northstar-employment-letter-demo.pdf' },
-  { question_id: 'bank_statement', reference: 'alex-morgan-proof-of-funds-demo.pdf' },
-  { question_id: 'travel_itinerary', reference: 'new-york-itinerary-demo.pdf' },
-  { question_id: 'supporting_letter', reference: 'host-support-letter-demo.pdf' },
-]
 
 export function buildInterviewRequest(
   state: ApplicationState,
@@ -94,7 +59,6 @@ export function buildInterviewRequest(
   turnNumber: number,
   lastQuestion: string,
   latestAnswer: string,
-  appliedProfileSections: ApprovedProfileSection[],
 ): InterviewRequest {
   const applicable = new Set(state.flow?.applicableQuestionIds ?? questions.map((question) => question.id))
   return {
@@ -121,21 +85,17 @@ export function buildInterviewRequest(
     pending_sensitive_confirmations: Object.entries(state.answers)
       .filter(([, answer]) => answer.verificationStatus === 'needs_confirmation')
       .map(([questionId]) => questionId),
-    approved_profile_sections_already_applied: appliedProfileSections,
-    available_profile_sections: profileSections,
-    available_fictional_evidence: fictionalEvidence,
   }
 }
 
 export function suggestionForQuestion(questionId: string | null) {
   const suggestions: Record<string, string> = {
     travel_purpose: 'Tourism in New York from October 12 to October 21, 2026',
-    funding: 'I will pay myself, and my approved employment information is still current',
-    current_employer: 'Yes, my approved employment profile is current',
+    funding: 'I will pay myself. I work at Northstar Labs as a product designer',
+    current_employer: 'I work at Northstar Labs as a product designer',
     prior_visits: 'I visited in 2024, I have never had a refusal, and I have no dependants',
-    passport_scan: 'Yes, attach the available fictional demo documents',
+    passport_scan: 'I have a passport scan and bank statement ready',
     review_name_match: 'Yes, I reviewed everything and explicitly confirm all five declarations and sensitive answers',
   }
   return questionId ? suggestions[questionId] ?? '' : ''
 }
-

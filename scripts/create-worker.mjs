@@ -14,14 +14,13 @@ const questionIds = [
 ]
 
 const nextQuestionIds = [...questionIds, 'funding', 'profile_employment', 'documents', 'final_review']
-const profileSections = ['identity', 'passport', 'contact', 'addresses', 'employment', 'education', 'family']
 const nullableEnum = (values) => ({ anyOf: [{ type: 'string', enum: values }, { type: 'null' }] })
 
 const interviewSchema = {
   type: 'object',
   properties: {
-    assistant_message: { type: 'string', minLength: 1, maxLength: 900 },
-    decision_summary: { type: 'string', minLength: 1, maxLength: 300 },
+    assistant_message: { type: 'string', minLength: 1, maxLength: 120 },
+    decision_summary: { type: 'string', minLength: 1, maxLength: 160 },
     route: {
       type: 'object',
       properties: {
@@ -32,11 +31,6 @@ const interviewSchema = {
       required: ['purpose', 'funding', 'prior_visit'],
       additionalProperties: false,
     },
-    approved_profile_sections: {
-      type: 'array',
-      maxItems: 7,
-      items: { type: 'string', enum: profileSections },
-    },
     updates: {
       type: 'array',
       maxItems: 12,
@@ -46,7 +40,7 @@ const interviewSchema = {
           question_id: { type: 'string', enum: questionIds },
           value: { type: 'string', minLength: 1, maxLength: 500 },
           confidence: { type: 'number', minimum: 0.7, maximum: 1 },
-          source: { type: 'string', enum: ['user_statement', 'document'] },
+          source: { type: 'string', enum: ['user_statement'] },
         },
         required: ['question_id', 'value', 'confidence', 'source'],
         additionalProperties: false,
@@ -58,11 +52,11 @@ const interviewSchema = {
       items: { type: 'string', enum: questionIds },
     },
     next_question_id: nullableEnum(nextQuestionIds),
-    next_question: { anyOf: [{ type: 'string', minLength: 1, maxLength: 700 }, { type: 'null' }] },
+    next_question: { anyOf: [{ type: 'string', minLength: 1, maxLength: 180 }, { type: 'null' }] },
     is_complete: { type: 'boolean' },
   },
   required: [
-    'assistant_message', 'decision_summary', 'route', 'approved_profile_sections', 'updates',
+    'assistant_message', 'decision_summary', 'route', 'updates',
     'confirm_question_ids', 'next_question_id', 'next_question', 'is_complete',
   ],
   additionalProperties: false,
@@ -75,12 +69,12 @@ Your job is planning and extraction only. The website owns routing, validation, 
 Rules:
 1. Extract updates only when the latest answer explicitly states the fact or clearly answers the last question. Never invent identifiers, addresses, dates, travel history, refusals, relationships, or declarations. Normalize dates to YYYY-MM-DD, yes/no values to Yes or No, and select values exactly as supplied in each missing question's options.
 2. Return the best-known complete route. Infer purpose, funding, and prior_visit only from explicit language; otherwise preserve a known current route or return null.
-3. The connected synthetic profile is already approved. You may request non-time-sensitive profile sections that are relevant and not already applied. Request employment only when the latest answer explicitly confirms the approved employment profile is current. Never emit profile values as updates; the website applies them locally through its typed WebMCP tools.
-4. A document update is allowed only when the user explicitly authorizes attaching available fictional evidence. Use the exact question_id and reference supplied in available_fictional_evidence and source=document.
-5. Sensitive existing answers stay pending until final review. Populate confirm_question_ids only if the latest answer explicitly confirms sensitive answers. Never treat silence, a generic yes to another question, or model inference as confirmation.
-6. Populate review_* fields only when the user explicitly confirms the relevant declaration. The final review can bundle the five declarations when the user clearly confirms all of them.
-7. Ask one adaptive, conversational next question. Bundle two to four closely related facts so a cooperative user can finish in about five turns: trip; funding plus current employment; travel/refusal plus small remaining facts; documents; final review. Skip anything already resolved or inapplicable.
-8. Respond in the requested locale. Be concise and explain what the website learned or why the next question matters. Do not claim the form is complete unless projected missing applicable questions, confirmations, evidence, and conflicts are all zero.
+3. This is a fresh user with no connected profile and no pre-approved personal facts. Every update must use source=user_statement and be directly supported by the latest answer. Never fill a field merely because it is typical, likely, or useful.
+4. Sensitive existing answers stay pending until final review. Populate confirm_question_ids only if the latest answer explicitly confirms sensitive answers. Never treat silence, a generic yes to another question, or model inference as confirmation.
+5. Populate review_* fields only when the user explicitly confirms the relevant declaration. The final review can bundle the five declarations when the user clearly confirms all of them.
+6. Ask exactly one short, specific next question. It may request at most three closely related missing facts, and must name those facts explicitly. Avoid broad prompts such as "tell me more." Prefer questions like "Who will pay, and what are your employer and job title?"
+7. next_question must be at most 24 words. assistant_message must be one short acknowledgement and must not repeat the question. decision_summary must be a compact factual explanation.
+8. Respond in the requested locale. Skip anything already resolved or inapplicable. Do not claim the form is complete unless projected missing applicable questions, confirmations, evidence, and conflicts are all zero.
 9. This is a fictional application. Never claim submission, approval, legal advice, or government affiliation.`
 
 const worker = `const INTERVIEW_SCHEMA = ${JSON.stringify(interviewSchema)};
@@ -179,7 +173,7 @@ async function planInterview(request, env) {
             schema: INTERVIEW_SCHEMA,
           },
         },
-        max_output_tokens: 1800,
+        max_output_tokens: 1200,
         store: false,
       }),
     });
