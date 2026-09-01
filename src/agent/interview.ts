@@ -29,6 +29,7 @@ export interface InterviewTurnPlan {
   updates: InterviewUpdate[]
   confirm_question_ids: string[]
   requested_question_ids: string[]
+  next_chapter: 'trip_story' | 'life_at_home' | 'work_journey' | 'identity_passport' | 'travel_history' | 'final_review' | null
   next_question_id: string | null
   next_question: string | null
   is_complete: boolean

@@ -124,7 +124,8 @@ describe('WebMcpProvider', () => {
     const assistant = await screen.findByRole('dialog', { name: 'Application assistant' }, { timeout: 1500 })
     fireEvent.click(screen.getByRole('button', { name: 'Type instead' }))
     const currentQuestion = screen.getByRole('region', { name: 'Current question' })
-    expect(currentQuestion).toHaveTextContent('Tell me your trip as one story')
+    expect(currentQuestion).toHaveTextContent('Imagine you’re telling a friend about this trip')
+    expect(currentQuestion).toHaveTextContent('STORY CHAPTER · YOUR TRIP')
     fireEvent.change(screen.getByPlaceholderText('Speak or type naturally…'), { target: { value: 'Tourism in New York from October 12 to October 21, 2026' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 

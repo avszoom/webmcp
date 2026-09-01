@@ -9,8 +9,7 @@ import { questions } from '../data/questions'
 import type { PrefillToolCall } from '../webmcp/demoCalls'
 import { useApplication } from '../state/ApplicationContext'
 import { useWebMcp } from '../webmcp/WebMcpContext'
-import { sectionName, type Locale } from '../i18n'
-import type { SectionId } from '../types'
+import type { Locale } from '../i18n'
 import { BotIcon, CheckIcon, LockIcon, RefreshIcon, SparkleIcon, WarningIcon, XIcon } from './Icons'
 
 type InterviewStage = 'intro' | 'interview' | 'complete'
@@ -21,8 +20,9 @@ interface ChatMessage {
   text: string
   detail?: string
   progress?: TurnProgress
-  requestedQuestionIds?: string[]
 }
+
+type StoryChapter = NonNullable<InterviewTurnPlan['next_chapter']>
 
 interface TurnProgress {
   route: string
@@ -41,6 +41,29 @@ const speechLocales: Record<Locale, string> = {
   en: 'en-US', es: 'es-US', fr: 'fr-FR', hi: 'hi-IN',
 }
 
+const storyChapterLabels: Record<Locale, Record<StoryChapter, string>> = {
+  en: {
+    trip_story: 'STORY CHAPTER · YOUR TRIP',
+    life_at_home: 'STORY CHAPTER · LIFE AT HOME',
+    work_journey: 'STORY CHAPTER · HOW YOU GOT HERE',
+    identity_passport: 'STORY CHAPTER · YOUR TRAVEL DOCUMENT',
+    travel_history: 'STORY CHAPTER · LOOKING BACK',
+    final_review: 'FINAL CHAPTER · YOUR REVIEW',
+  },
+  es: {
+    trip_story: 'CAPÍTULO · SU VIAJE', life_at_home: 'CAPÍTULO · SU VIDA EN CASA', work_journey: 'CAPÍTULO · CÓMO LLEGÓ HASTA AQUÍ',
+    identity_passport: 'CAPÍTULO · SU DOCUMENTO DE VIAJE', travel_history: 'CAPÍTULO · MIRANDO ATRÁS', final_review: 'CAPÍTULO FINAL · SU REVISIÓN',
+  },
+  fr: {
+    trip_story: 'CHAPITRE · VOTRE VOYAGE', life_at_home: 'CHAPITRE · VOTRE VIE CHEZ VOUS', work_journey: 'CHAPITRE · VOTRE PARCOURS',
+    identity_passport: 'CHAPITRE · VOTRE DOCUMENT DE VOYAGE', travel_history: 'CHAPITRE · RETOUR EN ARRIÈRE', final_review: 'CHAPITRE FINAL · VOTRE VÉRIFICATION',
+  },
+  hi: {
+    trip_story: 'कहानी · आपकी यात्रा', life_at_home: 'कहानी · घर पर आपका जीवन', work_journey: 'कहानी · आपका सफ़र',
+    identity_passport: 'कहानी · आपका यात्रा दस्तावेज़', travel_history: 'कहानी · पीछे मुड़कर', final_review: 'अंतिम अध्याय · आपकी समीक्षा',
+  },
+}
+
 const initialFastIntakeIds = [
   'travel_purpose', 'arrival_date', 'departure_date', 'destination_city', 'stay_address',
   'prior_visits', 'current_city', 'current_country', 'current_employer', 'job_title', 'employment_start',
@@ -51,7 +74,7 @@ const content = {
     greeting: 'This application is deliberately long, but we can finish the applicable path together. I only use facts you state, remove questions that do not apply, and show every WebMCP action.',
     privacy: 'Your answer is sent to OpenAI for planning. The API key stays server-side, every value is validated by this website, and nothing is submitted.',
     startVoice: 'Start with voice', type: 'Type instead', later: 'Not now',
-    trip: 'Tell me your trip as one story: why you’re going, your dates and cities, where you’ll stay, who pays, where you live, and what you do for work.',
+    trip: 'Imagine you’re telling a friend about this trip. Take me from home to the United States—what is the plan, and what makes you want to go?',
     placeholder: 'Speak or type naturally…', send: 'Send', listening: 'Listening through pauses…',
     listeningHint: 'Take your time. Click the red square when you are finished, then review and send.',
     activity: 'Agent decisions & WebMCP actions', routePending: 'Route not selected', restart: 'Start over',
@@ -60,21 +83,21 @@ const content = {
     greeting: 'Esta solicitud es deliberadamente larga, pero podemos completar juntos la ruta aplicable. Cuénteme su viaje con sus propias palabras; decidiré qué preguntar después y explicaré cada acción WebMCP.',
     privacy: 'Su respuesta se envía a OpenAI para planificar. La clave permanece en el servidor, este sitio valida cada valor y no se envía ninguna solicitud.',
     startVoice: 'Comenzar por voz', type: 'Escribir', later: 'Ahora no',
-    trip: 'Cuénteme su viaje como una historia: por qué va, fechas y ciudades, dónde se alojará, quién paga, dónde vive y en qué trabaja.',
+    trip: 'Imagine que le cuenta este viaje a un amigo. Lléveme desde su casa hasta Estados Unidos: ¿cuál es el plan y por qué quiere ir?',
     placeholder: 'Hable o escriba naturalmente…', send: 'Enviar', listening: 'Escuchando durante las pausas…', listeningHint: 'Tómese su tiempo. Pulse el cuadrado rojo al terminar; luego revise y envíe.', activity: 'Decisiones y acciones WebMCP', routePending: 'Ruta sin seleccionar', restart: 'Empezar de nuevo',
   },
   fr: {
     greeting: 'Cette demande est volontairement longue, mais nous pouvons terminer ensemble le parcours applicable. Décrivez votre voyage librement ; je choisirai la prochaine question et expliquerai chaque action WebMCP.',
     privacy: 'Votre réponse est envoyée à OpenAI pour la planification. La clé reste côté serveur, ce site valide chaque valeur et rien n’est soumis.',
     startVoice: 'Commencer par la voix', type: 'Écrire', later: 'Plus tard',
-    trip: 'Racontez-moi votre voyage naturellement : pourquoi vous partez, les dates et villes, le logement, qui paie, où vous vivez et votre travail.',
+    trip: 'Imaginez que vous racontez ce voyage à un ami. Emmenez-moi de chez vous aux États-Unis : quel est le projet et pourquoi partir ?',
     placeholder: 'Parlez ou écrivez naturellement…', send: 'Envoyer', listening: 'Écoute maintenue pendant les pauses…', listeningHint: 'Prenez votre temps. Cliquez sur le carré rouge lorsque vous avez terminé, puis relisez et envoyez.', activity: 'Décisions et actions WebMCP', routePending: 'Parcours non sélectionné', restart: 'Recommencer',
   },
   hi: {
     greeting: 'यह आवेदन जानबूझकर लंबा है, लेकिन हम सही रास्ता साथ मिलकर पूरा कर सकते हैं। अपनी यात्रा सामान्य भाषा में बताइए; मैं अगला उपयोगी सवाल चुनूँगा और हर WebMCP कार्रवाई समझाऊँगा।',
     privacy: 'योजना बनाने के लिए आपका उत्तर OpenAI को भेजा जाता है। API कुंजी सर्वर पर रहती है, वेबसाइट हर मान जाँचती है और कुछ भी जमा नहीं होता।',
     startVoice: 'आवाज़ से शुरू करें', type: 'टाइप करें', later: 'अभी नहीं',
-    trip: 'अपनी यात्रा की कहानी बताइए: क्यों जा रहे हैं, तारीखें और शहर, कहाँ रहेंगे, खर्च कौन देगा, कहाँ रहते हैं और क्या काम करते हैं।',
+    trip: 'मान लीजिए आप किसी दोस्त को यह यात्रा सुना रहे हैं। घर से अमेरिका तक की योजना क्या है, और आप क्यों जाना चाहते हैं?',
     placeholder: 'स्वाभाविक रूप से बोलें या लिखें…', send: 'भेजें', listening: 'रुकने पर भी सुन रहा हूँ…', listeningHint: 'आराम से बोलें। पूरा होने पर लाल चौकोर दबाएँ, फिर जाँचकर भेजें।', activity: 'एजेंट निर्णय और WebMCP कार्रवाई', routePending: 'रास्ता चुना नहीं गया', restart: 'फिर से शुरू करें',
   },
 } as const
@@ -96,7 +119,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [lastQuestion, setLastQuestion] = useState<string>(copy.trip)
   const [currentQuestion, setCurrentQuestion] = useState<string>(copy.trip)
-  const [currentQuestionIds, setCurrentQuestionIds] = useState<string[]>(initialFastIntakeIds)
+  const [currentChapter, setCurrentChapter] = useState<StoryChapter>('trip_story')
   const [turnNumber, setTurnNumber] = useState(0)
   const [plannerError, setPlannerError] = useState<string | null>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
@@ -140,10 +163,9 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
     text: string,
     detail?: string,
     progress?: TurnProgress,
-    requestedQuestionIds?: string[],
   ) => {
     setMessages((current) => [...current, {
-      id: `${role}-${Date.now()}-${current.length}`, role, text, detail, progress, requestedQuestionIds,
+      id: `${role}-${Date.now()}-${current.length}`, role, text, detail, progress,
     }])
   }
 
@@ -267,7 +289,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       addMessage('agent', plan.assistant_message, plan.decision_summary, progress)
       setLastQuestion(plan.next_question ?? '')
       setCurrentQuestion(plan.next_question ?? '')
-      setCurrentQuestionIds(plan.requested_question_ids ?? [])
+      setCurrentChapter(plan.next_chapter ?? currentChapter)
       if (plan.is_complete) {
         stageRef.current = 'complete'
         setStage('complete')
@@ -288,7 +310,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
     const requestedLabels = initialFastIntakeIds.map((id) => questionMap.get(id)?.label ?? id)
     setLastQuestion(`${copy.trip} Requested fields: ${requestedLabels.join(', ')}`)
     setCurrentQuestion(copy.trip)
-    setCurrentQuestionIds(initialFastIntakeIds)
+    setCurrentChapter('trip_story')
     if (withVoice) window.setTimeout(startListening, 300)
   }
 
@@ -415,7 +437,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       </div>
 
       {stage === 'interview' && currentQuestion && (
-        <CurrentQuestionCard locale={locale} question={currentQuestion} questionIds={currentQuestionIds} />
+        <CurrentQuestionCard locale={locale} question={currentQuestion} chapter={currentChapter} />
       )}
 
       {stage === 'interview' && (
@@ -453,22 +475,12 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   )
 }
 
-function CurrentQuestionCard({ locale, question, questionIds }: { locale: Locale; question: string; questionIds: string[] }) {
-  const groups = new Map<string, number>()
-  for (const questionId of questionIds) {
-    const question = questionMap.get(questionId)
-    if (!question) continue
-    groups.set(question.sectionId, (groups.get(question.sectionId) ?? 0) + 1)
-  }
-  const storyAreas = [...groups.keys()]
-    .slice(0, 4)
-    .map((sectionId) => sectionName(locale, sectionId as SectionId, sectionId))
-
+function CurrentQuestionCard({ locale, question, chapter }: { locale: Locale; question: string; chapter: StoryChapter }) {
   return (
     <section className="assistant-next-question" aria-live="polite" aria-label="Current question">
-      <div className="assistant-next-question__label"><SparkleIcon /><span>ANSWER THIS NEXT</span></div>
+      <div className="assistant-next-question__label"><SparkleIcon /><span>{storyChapterLabels[locale][chapter]}</span><em>ANSWER THIS NEXT</em></div>
       <p>{question}</p>
-      <div className="assistant-next-question__scope"><span>{storyAreas.join(' + ')}</span><strong>One answer can resolve up to {questionIds.length} items</strong></div>
+      <div className="assistant-next-question__scope"><span>Tell it naturally—I’ll connect the details and ask only about real gaps.</span></div>
     </section>
   )
 }

@@ -14,6 +14,7 @@ const questionIds = [
 ]
 
 const nextQuestionIds = [...questionIds, 'funding', 'profile_employment', 'documents', 'final_review']
+const storyChapters = ['trip_story', 'life_at_home', 'work_journey', 'identity_passport', 'travel_history', 'final_review']
 const nullableEnum = (values) => ({ anyOf: [{ type: 'string', enum: values }, { type: 'null' }] })
 
 const interviewSchema = {
@@ -59,13 +60,14 @@ const interviewSchema = {
       maxItems: 12,
       items: { type: 'string', enum: questionIds },
     },
+    next_chapter: nullableEnum(storyChapters),
     next_question_id: nullableEnum(nextQuestionIds),
     next_question: { anyOf: [{ type: 'string', minLength: 1, maxLength: 260 }, { type: 'null' }] },
     is_complete: { type: 'boolean' },
   },
   required: [
     'assistant_message', 'decision_summary', 'route', 'updates',
-    'confirm_question_ids', 'requested_question_ids', 'next_question_id', 'next_question', 'is_complete',
+    'confirm_question_ids', 'requested_question_ids', 'next_chapter', 'next_question_id', 'next_question', 'is_complete',
   ],
   additionalProperties: false,
 }
@@ -81,8 +83,13 @@ Rules:
 4. This is a fresh user with no connected profile and no pre-approved personal facts. Every update must use source=user_statement and have evidence in the latest answer. Never fill a field merely because it is typical, likely, or useful.
 5. Sensitive fields may be extracted only when explicit; never mark them basis=derived. Sensitive existing answers stay pending until final review. Populate confirm_question_ids only if the latest answer explicitly confirms them.
 6. Populate review_* fields only when the user explicitly confirms the relevant declaration. The final review can bundle the five declarations when the user clearly confirms all of them.
-7. Design the conversation as adaptive story arcs, not a form checklist. For the next turn choose 5 to 10 compatible missing fields that a person can naturally answer together. Prioritize a single coherent goal: trip story and funding; personal and household snapshot; passport and contact; work and education history; or travel history and review. Use requested_question_ids only as the hidden extraction target.
-8. Ask exactly one warm, conversational next_question of 18 to 36 words. Explain the coherent story you want, mention at most five natural cues, and never enumerate field labels. assistant_message must be one short acknowledgement and must not repeat the question. decision_summary must say what the answer resolved and any important inference.
+7. Design the conversation as adaptive story chapters, never as a disguised form. Choose the best next_chapter and 5 to 10 compatible missing fields as the hidden extraction target. The user must never see or hear the field list. Chapters are: trip_story, life_at_home, work_journey, identity_passport, travel_history, and final_review.
+8. Ask exactly one warm next_question of 14 to 28 words that invites a story, memory, or description. Ask for one coherent chapter, not a bundle of data. Mention at most two natural cues. Never reuse form-label wording, never say “share/provide your X, Y, and Z,” and never enumerate with a list of commas. If the draft resembles a questionnaire, rewrite it as something a thoughtful human interviewer would ask.
+Good: “Tell me the story of what you do today and how you got there.”
+Good: “What does life at home look like for you—the place and people you’ll return to?”
+Good: “Imagine you’re telling a friend about this trip. What is the plan, and what makes you want to go?”
+Bad: “Share your job title, employment start date, employer address, monthly income, and education.”
+assistant_message must be one short, warm acknowledgement and must not repeat the question. decision_summary must say what the answer resolved and any important inference.
 9. Respond in the requested locale. Skip anything already resolved or inapplicable. Do not claim the form is complete unless projected missing applicable questions, confirmations, evidence, and conflicts are all zero.
 10. This is a fictional application. Never claim submission, approval, legal advice, or government affiliation.`
 
