@@ -2520,6 +2520,19 @@ textarea:focus-visible {
 .turn-progress__trust { padding-top: 8px; display: flex; align-items: center; gap: 5px; color: #3c6355; font-size: 8px; font-weight: 700; }
 .turn-progress__trust svg { width: 12px; flex: 0 0 auto; }
 
+.assistant-glass-panel .turn-progress { color: #eef8ff; background: rgba(5, 24, 48, .82); border-color: rgba(102, 210, 255, .42); border-left-color: #59d990; box-shadow: 0 12px 30px rgba(0, 8, 28, .28); }
+.assistant-glass-panel .turn-progress__header { color: #a9dfc0; }
+.assistant-glass-panel .turn-progress__header strong { color: #eafff1; }
+.assistant-glass-panel .turn-progress__bar { background: rgba(224, 244, 255, .16); }
+.assistant-glass-panel .turn-progress__route,
+.assistant-glass-panel .turn-progress__derived { border-color: rgba(224, 244, 255, .13); }
+.assistant-glass-panel .turn-progress__route span,
+.assistant-glass-panel .turn-progress__derived span { color: rgba(232, 246, 255, .72); }
+.assistant-glass-panel .turn-progress__route strong,
+.assistant-glass-panel .turn-progress__derived strong { color: #f7fbff; }
+.assistant-glass-panel .turn-progress__derived { background: rgba(72, 184, 117, .11); }
+.assistant-glass-panel .turn-progress__trust { color: #a9dfc0; }
+
 .assistant-footer-actions { min-height: 42px; display: flex; background: #fff; border-top: 1px solid #d6d7d9; }
 .assistant-review-toggle { min-height: 41px; padding: 0 11px; display: inline-flex; align-items: center; gap: 5px; color: #7a4100; background: #fff4ce; border: 0; border-right: 1px solid #e5c365; cursor: pointer; font-size: 9px; font-weight: 800; white-space: nowrap; }
 .assistant-review-toggle svg { width: 13px; }
