@@ -3025,6 +3025,13 @@ textarea:focus-visible {
 .requested-facts__groups strong { display: block; margin-bottom: 3px; color: #99e6ff; font-size: 10px; text-transform: capitalize; }
 .requested-facts__groups span { display: block; color: rgba(246,251,255,.82); font-size: 9px; line-height: 1.45; }
 .requested-facts > small { display: block; color: rgba(235,247,255,.62); font-size: 9px; }
+.requested-facts__story { margin: 10px 0 8px; padding: 10px 11px; display: flex; align-items: center; justify-content: space-between; gap: 10px; color: rgba(244,251,255,.82); background: rgba(255,255,255,.08); border-radius: 10px; }
+.requested-facts__story span { font-size: 10px; line-height: 1.4; }
+.requested-facts__story strong { flex: 0 0 auto; color: #99e6ff; font-size: 10px; }
+.turn-progress__inferred { padding: 7px; display: grid; grid-template-columns: auto 1fr; gap: 7px; color: #eaf9ff; background: rgba(75, 170, 255, .13); border: 1px solid rgba(119, 209, 255, .2); border-radius: 9px; }
+.turn-progress__inferred > svg { width: 14px; color: #8fe4ff; }
+.turn-progress__inferred span { display: block; color: rgba(231,246,255,.72); font-size: 8px; line-height: 1.4; }
+.turn-progress__inferred strong { display: block; margin-bottom: 2px; color: #fff; font-size: 10px; }
 
 .assistant-glass-panel .assistant-intro-actions { margin-left: 34px; }
 .assistant-glass-panel .assistant-intro-actions button { color: #fff; background: rgba(255,255,255,.08); border-color: rgba(126,210,255,.55); border-radius: 12px; }

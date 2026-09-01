@@ -63,7 +63,7 @@ export interface ToolActivity {
 }
 
 export interface DerivedInsight {
-  id: 'trip_duration' | 'passport_validity' | 'employment_tenure'
+  id: 'trip_duration' | 'passport_validity' | 'age_at_travel' | 'employment_tenure'
   label: string
   value: string
   explanation: string

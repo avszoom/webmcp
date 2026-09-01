@@ -9,7 +9,7 @@ import { questions } from '../data/questions'
 import type { PrefillToolCall } from '../webmcp/demoCalls'
 import { useApplication } from '../state/ApplicationContext'
 import { useWebMcp } from '../webmcp/WebMcpContext'
-import { questionName, sectionName, type Locale } from '../i18n'
+import { sectionName, type Locale } from '../i18n'
 import type { SectionId } from '../types'
 import { BotIcon, CheckIcon, LockIcon, RefreshIcon, SparkleIcon, WarningIcon, XIcon } from './Icons'
 
@@ -27,6 +27,7 @@ interface ChatMessage {
 interface TurnProgress {
   route: string
   fields: string[]
+  inferredFields: Array<{ label: string; value: string; explanation: string }>
   derived: Array<{ label: string; value: string }>
   completed: number
   total: number
@@ -41,11 +42,8 @@ const speechLocales: Record<Locale, string> = {
 }
 
 const initialFastIntakeIds = [
-  'travel_purpose', 'arrival_date', 'departure_date', 'destination_city', 'stay_address', 'prior_visits', 'prior_refusal',
-  'legal_given_names', 'legal_family_name', 'date_of_birth', 'place_of_birth',
-  'passport_number', 'passport_country', 'passport_issue_date', 'passport_expiry_date',
-  'email', 'phone', 'current_street', 'current_city', 'current_region', 'current_postal_code', 'current_country',
-  'current_employer', 'job_title', 'marital_status', 'dependants',
+  'travel_purpose', 'arrival_date', 'departure_date', 'destination_city', 'stay_address',
+  'prior_visits', 'current_city', 'current_country', 'current_employer', 'job_title', 'employment_start',
 ]
 
 const content = {
@@ -53,7 +51,7 @@ const content = {
     greeting: 'This application is deliberately long, but we can finish the applicable path together. I only use facts you state, remove questions that do not apply, and show every WebMCP action.',
     privacy: 'Your answer is sent to OpenAI for planning. The API key stays server-side, every value is validated by this website, and nothing is submitted.',
     startVoice: 'Start with voice', type: 'Type instead', later: 'Not now',
-    trip: 'Take one minute and share anything you know from these groups—in any order. Skip anything unknown.',
+    trip: 'Tell me your trip as one story: why you’re going, your dates and cities, where you’ll stay, who pays, where you live, and what you do for work.',
     placeholder: 'Speak or type naturally…', send: 'Send', listening: 'Listening through pauses…',
     listeningHint: 'Take your time. Click the red square when you are finished, then review and send.',
     activity: 'Agent decisions & WebMCP actions', routePending: 'Route not selected', restart: 'Start over',
@@ -62,21 +60,21 @@ const content = {
     greeting: 'Esta solicitud es deliberadamente larga, pero podemos completar juntos la ruta aplicable. Cuénteme su viaje con sus propias palabras; decidiré qué preguntar después y explicaré cada acción WebMCP.',
     privacy: 'Su respuesta se envía a OpenAI para planificar. La clave permanece en el servidor, este sitio valida cada valor y no se envía ninguna solicitud.',
     startVoice: 'Comenzar por voz', type: 'Escribir', later: 'Ahora no',
-    trip: 'Empiece donde quiera: ¿por qué visita Estados Unidos, dónde se alojará y qué fechas considera?',
+    trip: 'Cuénteme su viaje como una historia: por qué va, fechas y ciudades, dónde se alojará, quién paga, dónde vive y en qué trabaja.',
     placeholder: 'Hable o escriba naturalmente…', send: 'Enviar', listening: 'Escuchando durante las pausas…', listeningHint: 'Tómese su tiempo. Pulse el cuadrado rojo al terminar; luego revise y envíe.', activity: 'Decisiones y acciones WebMCP', routePending: 'Ruta sin seleccionar', restart: 'Empezar de nuevo',
   },
   fr: {
     greeting: 'Cette demande est volontairement longue, mais nous pouvons terminer ensemble le parcours applicable. Décrivez votre voyage librement ; je choisirai la prochaine question et expliquerai chaque action WebMCP.',
     privacy: 'Votre réponse est envoyée à OpenAI pour la planification. La clé reste côté serveur, ce site valide chaque valeur et rien n’est soumis.',
     startVoice: 'Commencer par la voix', type: 'Écrire', later: 'Plus tard',
-    trip: 'Commencez librement : pourquoi allez-vous aux États-Unis, où séjournerez-vous et à quelles dates ?',
+    trip: 'Racontez-moi votre voyage naturellement : pourquoi vous partez, les dates et villes, le logement, qui paie, où vous vivez et votre travail.',
     placeholder: 'Parlez ou écrivez naturellement…', send: 'Envoyer', listening: 'Écoute maintenue pendant les pauses…', listeningHint: 'Prenez votre temps. Cliquez sur le carré rouge lorsque vous avez terminé, puis relisez et envoyez.', activity: 'Décisions et actions WebMCP', routePending: 'Parcours non sélectionné', restart: 'Recommencer',
   },
   hi: {
     greeting: 'यह आवेदन जानबूझकर लंबा है, लेकिन हम सही रास्ता साथ मिलकर पूरा कर सकते हैं। अपनी यात्रा सामान्य भाषा में बताइए; मैं अगला उपयोगी सवाल चुनूँगा और हर WebMCP कार्रवाई समझाऊँगा।',
     privacy: 'योजना बनाने के लिए आपका उत्तर OpenAI को भेजा जाता है। API कुंजी सर्वर पर रहती है, वेबसाइट हर मान जाँचती है और कुछ भी जमा नहीं होता।',
     startVoice: 'आवाज़ से शुरू करें', type: 'टाइप करें', later: 'अभी नहीं',
-    trip: 'कहीं से भी शुरू करें: आप अमेरिका क्यों जा रहे हैं, कहाँ रहेंगे और कौन-सी तारीखें सोच रहे हैं?',
+    trip: 'अपनी यात्रा की कहानी बताइए: क्यों जा रहे हैं, तारीखें और शहर, कहाँ रहेंगे, खर्च कौन देगा, कहाँ रहते हैं और क्या काम करते हैं।',
     placeholder: 'स्वाभाविक रूप से बोलें या लिखें…', send: 'भेजें', listening: 'रुकने पर भी सुन रहा हूँ…', listeningHint: 'आराम से बोलें। पूरा होने पर लाल चौकोर दबाएँ, फिर जाँचकर भेजें।', activity: 'एजेंट निर्णय और WebMCP कार्रवाई', routePending: 'रास्ता चुना नहीं गया', restart: 'फिर से शुरू करें',
   },
 } as const
@@ -198,7 +196,14 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         })
       }
 
-      const updates = plan.updates.filter((update) => update.source === 'user_statement')
+      const updates = plan.updates
+        .filter((update) => update.source === 'user_statement')
+        .map((update) => ({
+          ...update,
+          basis: update.basis ?? 'explicit',
+          evidence_text: update.evidence_text ?? answer,
+          derivation: update.derivation ?? null,
+        }))
       if (updates.length) {
         calls.push({
           toolName: 'provide_interview_answers',
@@ -242,7 +247,16 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       const derived = deriveInsightsFromValues(projectedValues).map(({ label, value }) => ({ label, value }))
       const progress: TurnProgress = {
         route: projectedFlow.labels.join(' → '),
-        fields: updates.map((update) => questionMap.get(update.question_id)?.label ?? update.question_id),
+        fields: updates
+          .filter((update) => update.basis === 'explicit')
+          .map((update) => questionMap.get(update.question_id)?.label ?? update.question_id),
+        inferredFields: updates
+          .filter((update) => update.basis === 'derived')
+          .map((update) => ({
+            label: questionMap.get(update.question_id)?.label ?? update.question_id,
+            value: update.value,
+            explanation: update.derivation ?? 'Logically derived from your answer.',
+          })),
         derived,
         completed: projectedAnswerIds.size,
         total: projectedFlow.applicableQuestionIds.length,
@@ -438,27 +452,21 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
 }
 
 function RequestedFactsCard({ locale, questionIds }: { locale: Locale; questionIds: string[] }) {
-  const groups = new Map<string, typeof questions>()
+  const groups = new Map<string, number>()
   for (const questionId of questionIds) {
     const question = questionMap.get(questionId)
     if (!question) continue
-    const group = groups.get(question.sectionId) ?? []
-    group.push(question)
-    groups.set(question.sectionId, group)
+    groups.set(question.sectionId, (groups.get(question.sectionId) ?? 0) + 1)
   }
+  const storyAreas = [...groups.keys()]
+    .slice(0, 4)
+    .map((sectionId) => sectionName(locale, sectionId as SectionId, sectionId))
 
   return (
     <div className="requested-facts">
-      <div className="requested-facts__top"><SparkleIcon /><span><strong>FAST INTAKE</strong>{questionIds.length} fields can be completed from this answer</span></div>
-      <div className="requested-facts__groups">
-        {[...groups.entries()].map(([sectionId, sectionQuestions]) => (
-          <div key={sectionId}>
-            <strong>{sectionName(locale, sectionId as SectionId, sectionId)}</strong>
-            <span>{sectionQuestions.map((question) => questionName(locale, question.id, question.label)).join(' · ')}</span>
-          </div>
-        ))}
-      </div>
-      <small>Say only what you know. The agent will ask for remaining gaps later.</small>
+      <div className="requested-facts__top"><SparkleIcon /><span><strong>ONE NATURAL ANSWER</strong>I’ll understand the story, not make you follow form order.</span></div>
+      <div className="requested-facts__story"><span>{storyAreas.join(' + ')}</span><strong>→ up to {questionIds.length} answers</strong></div>
+      <small>Mention what you know. I’ll derive only what follows safely and ask about real gaps later.</small>
     </div>
   )
 }
@@ -471,8 +479,9 @@ function TurnProgressCard({ progress }: { progress: TurnProgress }) {
       <div className="turn-progress__bar"><span style={{ width: `${percentage}%` }} /></div>
       <div className="turn-progress__route"><CheckIcon /><span><strong>{progress.route}</strong>{progress.removed} irrelevant questions removed</span></div>
       <div className="turn-progress__route"><CheckIcon /><span><strong>{progress.fields.length ? `${progress.fields.length} verified field${progress.fields.length === 1 ? '' : 's'} filled` : 'No unverified fields added'}</strong>{progress.fields.length ? progress.fields.slice(0, 4).join(' · ') : 'Waiting for an explicit answer'}</span></div>
+      {progress.inferredFields.slice(0, 3).map((field) => <div className="turn-progress__inferred" key={field.label}><SparkleIcon /><span><strong>{field.label}: {field.value}</strong>{field.explanation} · reviewable</span></div>)}
       {progress.derived.slice(0, 2).map((insight) => <div className="turn-progress__derived" key={insight.label}><SparkleIcon /><span><strong>{insight.value}</strong>{insight.label} · derived from stated facts</span></div>)}
-      <div className="turn-progress__trust"><LockIcon /> Only facts from your last answer were written · {progress.actions} WebMCP actions</div>
+      <div className="turn-progress__trust"><LockIcon /> Stated and derived values stay visibly separate · {progress.actions} WebMCP actions</div>
     </div>
   )
 }

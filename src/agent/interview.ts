@@ -13,6 +13,9 @@ export interface InterviewUpdate {
   value: string
   confidence: number
   source: 'user_statement'
+  basis: 'explicit' | 'derived'
+  evidence_text: string
+  derivation: string | null
 }
 
 export interface InterviewTurnPlan {
