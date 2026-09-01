@@ -3,6 +3,10 @@ import { buildApplicationFlow } from '../agent/applicationFlow'
 import { deriveInsightsFromValues } from '../agent/derivations'
 import {
   buildInterviewRequest,
+  chooseNovelQuestion,
+  mergePartialFacts,
+  type InterviewHistoryTurn,
+  type InterviewPartialFact,
   type InterviewTurnPlan,
 } from '../agent/interview'
 import { questions } from '../data/questions'
@@ -29,6 +33,7 @@ interface TurnProgress {
   fields: string[]
   skippedFields: string[]
   inferredFields: Array<{ label: string; value: string; explanation: string }>
+  rememberedFacts: Array<{ label: string; value: string; missingDetail: string }>
   derived: Array<{ label: string; value: string }>
   completed: number
   total: number
@@ -67,7 +72,7 @@ const storyChapterLabels: Record<Locale, Record<StoryChapter, string>> = {
 
 const initialFastIntakeIds = [
   'travel_purpose', 'arrival_date', 'departure_date', 'destination_city', 'stay_address',
-  'prior_visits', 'current_city', 'current_country', 'current_employer', 'job_title', 'employment_start',
+  'prior_visits',
 ]
 
 const content = {
@@ -121,6 +126,9 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   const [lastQuestion, setLastQuestion] = useState<string>(copy.trip)
   const [currentQuestion, setCurrentQuestion] = useState<string>(copy.trip)
   const [currentChapter, setCurrentChapter] = useState<StoryChapter>('trip_story')
+  const [currentQuestionIds, setCurrentQuestionIds] = useState<string[]>(initialFastIntakeIds)
+  const [interviewHistory, setInterviewHistory] = useState<InterviewHistoryTurn[]>([])
+  const [partialFacts, setPartialFacts] = useState<InterviewPartialFact[]>([])
   const [turnNumber, setTurnNumber] = useState(0)
   const [plannerError, setPlannerError] = useState<string | null>(null)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
@@ -180,7 +188,11 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   const processAnswer = async (rawAnswer: string) => {
     const answer = rawAnswer.trim()
     if (!answer || working || stageRef.current !== 'interview') return
+    const answeredQuestion = currentQuestion || lastQuestion
+    const answeredChapter = currentChapter
+    const answeredQuestionIds = currentQuestionIds
     setDraft('')
+    setCurrentQuestion('')
     setPlannerError(null)
     addMessage('user', answer)
     setWorking(true)
@@ -195,6 +207,8 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         turnNumber + 1,
         lastQuestion,
         answer,
+        interviewHistory,
+        partialFacts,
       )
       const response = await fetch('/api/interview', {
         method: 'POST',
@@ -231,6 +245,14 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         }))
       const updates = plannedUpdates.filter((update) => applicableIds.has(update.question_id))
       const skippedUpdates = plannedUpdates.filter((update) => !applicableIds.has(update.question_id))
+      const incomingPartialFacts = (plan.partial_facts ?? [])
+        .filter((fact) => applicableIds.has(fact.question_id))
+        .filter((fact) => !updates.some((update) => update.question_id === fact.question_id))
+      const nextPartialFacts = mergePartialFacts(
+        partialFacts,
+        incomingPartialFacts,
+        updates.map((update) => update.question_id),
+      )
       if (updates.length) {
         calls.push({
           toolName: 'provide_interview_answers',
@@ -282,6 +304,11 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
             value: update.value,
             explanation: update.derivation ?? 'Logically derived from your answer.',
           })),
+        rememberedFacts: incomingPartialFacts.map((fact) => ({
+          label: questionMap.get(fact.question_id)?.label ?? fact.question_id,
+          value: fact.value,
+          missingDetail: fact.missing_detail,
+        })),
         derived,
         completed: projectedAnswerIds.size,
         total: projectedFlow.applicableQuestionIds.length,
@@ -290,10 +317,34 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       }
 
       await runCalls(calls)
+      const completedTurn: InterviewHistoryTurn = {
+        question: answeredQuestion,
+        answer,
+        extracted_question_ids: updates.map((update) => update.question_id),
+        discussed_question_ids: answeredQuestionIds,
+        chapter: answeredChapter,
+      }
+      const nextHistory = [...interviewHistory, completedTurn].slice(-5)
+      const nextQuestion = chooseNovelQuestion({
+        plan,
+        history: interviewHistory,
+        answeredQuestion,
+        answeredChapter,
+        answeredQuestionIds,
+        partialFacts: nextPartialFacts,
+      })
       setTurnNumber((current) => current + 1)
+      setInterviewHistory(nextHistory)
+      setPartialFacts(nextPartialFacts)
       addMessage('agent', plan.assistant_message, plan.decision_summary, progress)
-      setLastQuestion(plan.next_question ?? '')
-      setCurrentQuestion(plan.next_question ?? '')
+      setLastQuestion(nextQuestion)
+      setCurrentQuestion(nextQuestion)
+      const nextFocusIds = plan.question_focus_ids?.length
+        ? plan.question_focus_ids
+        : (plan.requested_question_ids ?? []).slice(0, 3)
+      setCurrentQuestionIds(nextFocusIds.filter((questionId) =>
+        applicableIds.has(questionId) && !projectedAnswerIds.has(questionId),
+      ))
       setCurrentChapter(plan.next_chapter ?? currentChapter)
       if (plan.is_complete) {
         stageRef.current = 'complete'
@@ -302,6 +353,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
     } catch (error) {
       const message = error instanceof Error ? error.message : 'The adaptive planner is temporarily unavailable.'
       setPlannerError(message)
+      setCurrentQuestion(answeredQuestion)
       addMessage('agent', `${message} Your answer was not applied. Please try again; I’ll keep the same question.`)
     } finally {
       setWorking(false)
@@ -316,6 +368,9 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
     setLastQuestion(`${copy.trip} Requested fields: ${requestedLabels.join(', ')}`)
     setCurrentQuestion(copy.trip)
     setCurrentChapter('trip_story')
+    setCurrentQuestionIds(initialFastIntakeIds)
+    setInterviewHistory([])
+    setPartialFacts([])
     if (withVoice) window.setTimeout(startListening, 300)
   }
 
@@ -441,7 +496,9 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         )}
       </div>
 
-      {stage === 'interview' && currentQuestion && (
+      {stage === 'interview' && working && !currentQuestion && <NextQuestionLoading />}
+
+      {stage === 'interview' && !working && currentQuestion && (
         <CurrentQuestionCard locale={locale} question={currentQuestion} chapter={currentChapter} />
       )}
 
@@ -480,6 +537,15 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   )
 }
 
+function NextQuestionLoading() {
+  return (
+    <section className="assistant-next-question assistant-next-question--loading" aria-live="polite" aria-label="Finding the next question">
+      <div className="assistant-next-question__label"><SparkleIcon /><span>BUILDING ON YOUR ANSWER</span></div>
+      <p>Finding the smallest useful gap—without asking you to repeat yourself…</p>
+    </section>
+  )
+}
+
 function CurrentQuestionCard({ locale, question, chapter }: { locale: Locale; question: string; chapter: StoryChapter }) {
   return (
     <section className="assistant-next-question" aria-live="polite" aria-label="Current question">
@@ -500,6 +566,7 @@ function TurnProgressCard({ progress }: { progress: TurnProgress }) {
       {progress.skippedFields.length > 0 && <div className="turn-progress__skipped"><CheckIcon /><span><strong>{progress.skippedFields.length} details no longer needed</strong>{progress.skippedFields.slice(0, 3).join(' · ')} were excluded after the route changed</span></div>}
       <div className="turn-progress__route"><CheckIcon /><span><strong>{progress.fields.length ? `${progress.fields.length} verified field${progress.fields.length === 1 ? '' : 's'} filled` : 'No unverified fields added'}</strong>{progress.fields.length ? progress.fields.slice(0, 4).join(' · ') : 'Waiting for an explicit answer'}</span></div>
       {progress.inferredFields.slice(0, 3).map((field) => <div className="turn-progress__inferred" key={field.label}><SparkleIcon /><span><strong>{field.label}: {field.value}</strong>{field.explanation} · reviewable</span></div>)}
+      {progress.rememberedFacts.length > 0 && <div className="turn-progress__remembered"><SparkleIcon /><span><strong>{progress.rememberedFacts.length} incomplete detail${progress.rememberedFacts.length === 1 ? '' : 's'} remembered</strong>{progress.rememberedFacts.slice(0, 3).map((fact) => `${fact.label}: ${fact.value} (${fact.missingDetail})`).join(' · ')}</span></div>}
       {progress.derived.slice(0, 2).map((insight) => <div className="turn-progress__derived" key={insight.label}><SparkleIcon /><span><strong>{insight.value}</strong>{insight.label} · derived from stated facts</span></div>)}
       <div className="turn-progress__trust"><LockIcon /> Stated and derived values stay visibly separate · {progress.actions} WebMCP actions</div>
     </div>

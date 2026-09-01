@@ -2513,6 +2513,10 @@ textarea:focus-visible {
 .turn-progress__route strong, .turn-progress__derived strong { display: block; margin-bottom: 1px; color: #162e51; font-size: 10px; }
 .turn-progress__derived { background: #f5faf6; }
 .turn-progress__derived > svg { color: #b46d22; }
+.turn-progress__remembered { padding: 7px; display: grid; grid-template-columns: auto 1fr; gap: 7px; color: #162e51; background: #fff8e8; border: 1px solid #f0ce78; border-radius: 9px; }
+.turn-progress__remembered > svg { width: 14px; color: #a96500; }
+.turn-progress__remembered span { display: block; color: #66511c; font-size: 8px; line-height: 1.4; }
+.turn-progress__remembered strong { display: block; margin-bottom: 2px; color: #3d310e; font-size: 10px; }
 .turn-progress__trust { padding-top: 8px; display: flex; align-items: center; gap: 5px; color: #3c6355; font-size: 8px; font-weight: 700; }
 .turn-progress__trust svg { width: 12px; flex: 0 0 auto; }
 
@@ -3045,6 +3049,10 @@ textarea:focus-visible {
 .assistant-next-question__label em { margin-left: auto; color: rgba(235,247,255,.66); font-size: 8px; font-style: normal; letter-spacing: .08em; }
 .assistant-next-question p { position: relative; margin: 6px 0 9px; color: #fff; font-size: 14px; font-weight: 700; line-height: 1.4; }
 .assistant-next-question__scope { position: relative; color: rgba(229,246,255,.7); font-size: 9px; line-height: 1.35; }
+.assistant-next-question--loading { border-color: rgba(154, 225, 255, .36); box-shadow: none; opacity: .88; }
+.assistant-next-question--loading p { color: rgba(241, 250, 255, .8); font-weight: 600; }
+.assistant-next-question--loading svg { animation: assistant-question-pulse 1.25s ease-in-out infinite; }
+@keyframes assistant-question-pulse { 0%, 100% { opacity: .45; transform: scale(.88); } 50% { opacity: 1; transform: scale(1.08); } }
 .turn-progress__inferred { padding: 7px; display: grid; grid-template-columns: auto 1fr; gap: 7px; color: #eaf9ff; background: rgba(75, 170, 255, .13); border: 1px solid rgba(119, 209, 255, .2); border-radius: 9px; }
 .turn-progress__inferred > svg { width: 14px; color: #8fe4ff; }
 .turn-progress__inferred span { display: block; color: rgba(231,246,255,.72); font-size: 8px; line-height: 1.4; }
@@ -3053,6 +3061,10 @@ textarea:focus-visible {
 .turn-progress__skipped > svg { width: 14px; color: #76e5a0; }
 .turn-progress__skipped span { display: block; color: rgba(225,250,234,.7); font-size: 8px; line-height: 1.4; }
 .turn-progress__skipped strong { display: block; margin-bottom: 2px; color: #effff4; font-size: 10px; }
+.assistant-glass-panel .turn-progress__remembered { color: #fff8df; background: rgba(223, 162, 39, .13); border-color: rgba(245, 199, 99, .3); }
+.assistant-glass-panel .turn-progress__remembered > svg { color: #ffd478; }
+.assistant-glass-panel .turn-progress__remembered span { color: rgba(255, 245, 216, .74); }
+.assistant-glass-panel .turn-progress__remembered strong { color: #fff9e9; }
 
 .assistant-glass-panel .assistant-intro-actions { margin-left: 34px; }
 .assistant-glass-panel .assistant-intro-actions button { color: #fff; background: rgba(255,255,255,.08); border-color: rgba(126,210,255,.55); border-radius: 12px; }

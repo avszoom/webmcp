@@ -95,7 +95,11 @@ describe('WebMcpProvider', () => {
           { question_id: 'departure_date', value: '2026-10-21', confidence: 0.98, source: 'user_statement' },
           { question_id: 'destination_city', value: 'New York', confidence: 0.99, source: 'user_statement' },
         ],
+        partial_facts: [],
         confirm_question_ids: [],
+        requested_question_ids: ['current_employer', 'job_title'],
+        question_focus_ids: ['current_employer', 'job_title'],
+        next_chapter: 'work_journey',
         next_question_id: 'funding',
         next_question: 'Who will pay, and what are your employer and job title?',
         is_complete: false,
@@ -110,16 +114,21 @@ describe('WebMcpProvider', () => {
           { question_id: 'highest_education', value: 'Bachelor’s degree', confidence: 0.96, source: 'user_statement' },
           { question_id: 'field_of_study', value: 'Design', confidence: 0.96, source: 'user_statement' },
         ],
+        partial_facts: [],
         confirm_question_ids: [],
+        requested_question_ids: ['prior_visits', 'prior_refusal', 'dependants'],
+        question_focus_ids: ['prior_visits', 'prior_refusal'],
+        next_chapter: 'travel_history',
         next_question_id: 'prior_visits',
         next_question: 'Have you visited before, had a visa refusal, or have any dependants?',
         is_complete: false,
       },
     ]
-    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ plan: plans.shift() }), {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({ plan: plans.shift() }), {
       status: 200,
       headers: { 'content-type': 'application/json' },
-    })))
+    }))
+    vi.stubGlobal('fetch', fetchMock)
     render(<ApplicationProvider><WebMcpProvider><App /></WebMcpProvider></ApplicationProvider>)
 
     await waitFor(() => expect(definitions).toHaveLength(22))
@@ -132,7 +141,7 @@ describe('WebMcpProvider', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
     await waitFor(() => expect(assistant).toHaveTextContent('Tourist visitor'), { timeout: 2500 })
-    expect(currentQuestion).toHaveTextContent('Who will pay, and what are your employer and job title?')
+    expect(screen.getByRole('region', { name: 'Current question' })).toHaveTextContent('Who will pay, and what are your employer and job title?')
     expect(screen.getByRole('region', { name: 'Application path' })).toHaveTextContent('Tourist visitor')
     expect(executeTool.mock.calls.map(([tool]) => tool.name)).toEqual(expect.arrayContaining([
       'select_application_flow', 'provide_interview_answers', 'derive_application_insights',
@@ -151,6 +160,54 @@ describe('WebMcpProvider', () => {
     const latestAnswers = JSON.parse(answerCalls.at(-1)?.[1] ?? '{}').answers as Array<{ question_id: string }>
     expect(latestAnswers.map((answer) => answer.question_id)).not.toEqual(expect.arrayContaining(['highest_education', 'field_of_study']))
     expect(assistant).toHaveTextContent('2 details no longer needed')
+    const secondRequest = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body)) as {
+      conversation_history: Array<{ answer: string; discussed_question_ids: string[] }>
+      resolved_answers: Array<{ id: string; value: string }>
+    }
+    expect(secondRequest.conversation_history[0].answer).toContain('Tourism in New York')
+    expect(secondRequest.conversation_history[0].discussed_question_ids).toContain('travel_purpose')
+    expect(secondRequest.resolved_answers.map((answer) => answer.id)).toEqual(expect.arrayContaining([
+      'travel_purpose', 'arrival_date', 'departure_date', 'destination_city',
+    ]))
+  })
+
+  it('removes the answered prompt while planning and pins only the new question at the bottom', async () => {
+    const { definitions } = installExecutableModelContext()
+    let releasePlan: ((response: Response) => void) | undefined
+    vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>((resolve) => { releasePlan = resolve })))
+    render(<ApplicationProvider><WebMcpProvider><App /></WebMcpProvider></ApplicationProvider>)
+
+    await waitFor(() => expect(definitions).toHaveLength(22))
+    await screen.findByRole('dialog', { name: 'Application assistant' }, { timeout: 1500 })
+    fireEvent.click(screen.getByRole('button', { name: 'Type instead' }))
+    fireEvent.change(screen.getByPlaceholderText('Speak or type naturally…'), { target: { value: 'I am visiting my brother in New York.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    expect(screen.queryByRole('region', { name: 'Current question' })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Finding the next question' })).toHaveTextContent('without asking you to repeat yourself')
+
+    releasePlan?.(new Response(JSON.stringify({
+      plan: {
+        assistant_message: 'I have the reason for your visit.',
+        decision_summary: 'A family visit to New York was recorded.',
+        route: { purpose: 'family_visit', funding: null, prior_visit: null },
+        updates: [
+          { question_id: 'travel_purpose', value: 'Family visit', confidence: 0.99, source: 'user_statement', basis: 'explicit', evidence_text: 'visiting my brother', derivation: null },
+          { question_id: 'destination_city', value: 'New York', confidence: 0.99, source: 'user_statement', basis: 'explicit', evidence_text: 'New York', derivation: null },
+        ],
+        partial_facts: [],
+        confirm_question_ids: [],
+        requested_question_ids: ['current_employer', 'job_title'],
+        question_focus_ids: ['current_employer', 'job_title'],
+        next_chapter: 'work_journey',
+        next_question_id: 'profile_employment',
+        next_question: 'Tell me the story of what you do today and how you got there.',
+        is_complete: false,
+      },
+    }), { status: 200, headers: { 'content-type': 'application/json' } }))
+
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Current question' })).toHaveTextContent('what you do today'))
+    expect(screen.queryByRole('region', { name: 'Finding the next question' })).not.toBeInTheDocument()
   })
 
   it('keeps voice capture open through final speech until the user presses stop', async () => {
