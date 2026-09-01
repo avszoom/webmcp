@@ -107,6 +107,8 @@ describe('WebMcpProvider', () => {
         updates: [
           { question_id: 'current_employer', value: 'Northstar Labs', confidence: 0.98, source: 'user_statement' },
           { question_id: 'job_title', value: 'Product Designer', confidence: 0.98, source: 'user_statement' },
+          { question_id: 'highest_education', value: 'Bachelor’s degree', confidence: 0.96, source: 'user_statement' },
+          { question_id: 'field_of_study', value: 'Design', confidence: 0.96, source: 'user_statement' },
         ],
         confirm_question_ids: [],
         next_question_id: 'prior_visits',
@@ -136,7 +138,7 @@ describe('WebMcpProvider', () => {
       'select_application_flow', 'provide_interview_answers', 'derive_application_insights',
     ]))
 
-    fireEvent.change(screen.getByPlaceholderText('Speak or type naturally…'), { target: { value: 'I will pay myself. I work at Northstar Labs as a product designer' } })
+    fireEvent.change(screen.getByPlaceholderText('Speak or type naturally…'), { target: { value: 'I will pay myself. I work at Northstar Labs as a product designer and studied design' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     await waitFor(() => expect(assistant).toHaveTextContent('Self-funded'), { timeout: 3000 })
     expect(screen.getByRole('region', { name: 'Application status' })).not.toHaveTextContent('0Completed')
@@ -145,6 +147,10 @@ describe('WebMcpProvider', () => {
     expect(executedTools).not.toEqual(expect.arrayContaining([
       'provide_identity_information', 'provide_passport_information', 'provide_contact_information', 'provide_address_history',
     ]))
+    const answerCalls = executeTool.mock.calls.filter(([tool]) => tool.name === 'provide_interview_answers')
+    const latestAnswers = JSON.parse(answerCalls.at(-1)?.[1] ?? '{}').answers as Array<{ question_id: string }>
+    expect(latestAnswers.map((answer) => answer.question_id)).not.toEqual(expect.arrayContaining(['highest_education', 'field_of_study']))
+    expect(assistant).toHaveTextContent('2 details no longer needed')
   })
 
   it('keeps voice capture open through final speech until the user presses stop', async () => {

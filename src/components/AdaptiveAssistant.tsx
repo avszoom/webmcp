@@ -27,6 +27,7 @@ type StoryChapter = NonNullable<InterviewTurnPlan['next_chapter']>
 interface TurnProgress {
   route: string
   fields: string[]
+  skippedFields: string[]
   inferredFields: Array<{ label: string; value: string; explanation: string }>
   derived: Array<{ label: string; value: string }>
   completed: number
@@ -216,7 +217,11 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         })
       }
 
-      const updates = plan.updates
+      const projectedFlow = purpose === 'undetermined'
+        ? (state.flow ?? buildApplicationFlow('undetermined'))
+        : buildApplicationFlow(purpose, funding, priorVisit)
+      const applicableIds = new Set(projectedFlow.applicableQuestionIds)
+      const plannedUpdates = plan.updates
         .filter((update) => update.source === 'user_statement')
         .map((update) => ({
           ...update,
@@ -224,6 +229,8 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
           evidence_text: update.evidence_text ?? answer,
           derivation: update.derivation ?? null,
         }))
+      const updates = plannedUpdates.filter((update) => applicableIds.has(update.question_id))
+      const skippedUpdates = plannedUpdates.filter((update) => !applicableIds.has(update.question_id))
       if (updates.length) {
         calls.push({
           toolName: 'provide_interview_answers',
@@ -239,21 +246,18 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         })
       }
 
-      if (plan.confirm_question_ids.length) {
+      const applicableConfirmations = plan.confirm_question_ids.filter((questionId) => applicableIds.has(questionId))
+      if (applicableConfirmations.length) {
         calls.push({
           toolName: 'confirm_sensitive_answers',
           label: 'Recording your explicit final confirmation',
-          input: { question_ids: plan.confirm_question_ids, explicit_confirmation: true },
+          input: { question_ids: applicableConfirmations, explicit_confirmation: true },
         })
       }
       if (plan.is_complete) {
         calls.push({ toolName: 'request_review', label: 'Checking readiness for human review', input: {} })
       }
 
-      const projectedFlow = purpose === 'undetermined'
-        ? (state.flow ?? buildApplicationFlow('undetermined'))
-        : buildApplicationFlow(purpose, funding, priorVisit)
-      const applicableIds = new Set(projectedFlow.applicableQuestionIds)
       const projectedAnswerIds = new Set(
         Object.entries(state.answers)
           .filter(([questionId, value]) => applicableIds.has(questionId) && value.value.trim())
@@ -270,6 +274,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         fields: updates
           .filter((update) => update.basis === 'explicit')
           .map((update) => questionMap.get(update.question_id)?.label ?? update.question_id),
+        skippedFields: skippedUpdates.map((update) => questionMap.get(update.question_id)?.label ?? update.question_id),
         inferredFields: updates
           .filter((update) => update.basis === 'derived')
           .map((update) => ({
@@ -492,6 +497,7 @@ function TurnProgressCard({ progress }: { progress: TurnProgress }) {
       <div className="turn-progress__header"><span>LIVE APPLICATION PROGRESS</span><strong>{progress.completed}/{progress.total}</strong></div>
       <div className="turn-progress__bar"><span style={{ width: `${percentage}%` }} /></div>
       <div className="turn-progress__route"><CheckIcon /><span><strong>{progress.route}</strong>{progress.removed} irrelevant questions removed</span></div>
+      {progress.skippedFields.length > 0 && <div className="turn-progress__skipped"><CheckIcon /><span><strong>{progress.skippedFields.length} details no longer needed</strong>{progress.skippedFields.slice(0, 3).join(' · ')} were excluded after the route changed</span></div>}
       <div className="turn-progress__route"><CheckIcon /><span><strong>{progress.fields.length ? `${progress.fields.length} verified field${progress.fields.length === 1 ? '' : 's'} filled` : 'No unverified fields added'}</strong>{progress.fields.length ? progress.fields.slice(0, 4).join(' · ') : 'Waiting for an explicit answer'}</span></div>
       {progress.inferredFields.slice(0, 3).map((field) => <div className="turn-progress__inferred" key={field.label}><SparkleIcon /><span><strong>{field.label}: {field.value}</strong>{field.explanation} · reviewable</span></div>)}
       {progress.derived.slice(0, 2).map((insight) => <div className="turn-progress__derived" key={insight.label}><SparkleIcon /><span><strong>{insight.value}</strong>{insight.label} · derived from stated facts</span></div>)}

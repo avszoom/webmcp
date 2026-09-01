@@ -3049,6 +3049,10 @@ textarea:focus-visible {
 .turn-progress__inferred > svg { width: 14px; color: #8fe4ff; }
 .turn-progress__inferred span { display: block; color: rgba(231,246,255,.72); font-size: 8px; line-height: 1.4; }
 .turn-progress__inferred strong { display: block; margin-bottom: 2px; color: #fff; font-size: 10px; }
+.turn-progress__skipped { padding: 7px; display: grid; grid-template-columns: auto 1fr; gap: 7px; color: #eaffef; background: rgba(48, 180, 101, .12); border-radius: 9px; }
+.turn-progress__skipped > svg { width: 14px; color: #76e5a0; }
+.turn-progress__skipped span { display: block; color: rgba(225,250,234,.7); font-size: 8px; line-height: 1.4; }
+.turn-progress__skipped strong { display: block; margin-bottom: 2px; color: #effff4; font-size: 10px; }
 
 .assistant-glass-panel .assistant-intro-actions { margin-left: 34px; }
 .assistant-glass-panel .assistant-intro-actions button { color: #fff; background: rgba(255,255,255,.08); border-color: rgba(126,210,255,.55); border-radius: 12px; }
