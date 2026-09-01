@@ -92,7 +92,7 @@ export interface InterviewRequest {
     sensitive: boolean
     evidence_required: boolean
   }>
-  pending_sensitive_confirmations: string[]
+  pending_review_question_ids: string[]
 }
 
 export function buildInterviewRequest(
@@ -145,7 +145,7 @@ export function buildInterviewRequest(
         sensitive: question.sensitivity === 'sensitive',
         evidence_required: Boolean(question.evidenceRequired),
       })),
-    pending_sensitive_confirmations: Object.entries(state.answers)
+    pending_review_question_ids: Object.entries(state.answers)
       .filter(([, answer]) => answer.verificationStatus === 'needs_confirmation')
       .map(([questionId]) => questionId),
   }

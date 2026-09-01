@@ -42,7 +42,7 @@ export function QuestionField({ question, locale = 'en' }: { question: Applicati
         <span>{question.helper ?? (answer ? answer.sourceLabel : 'Not answered')}</span>
         {answer && (
           <span className={answer.verificationStatus === 'needs_confirmation' ? 'status-pending' : 'status-confirmed'}>
-            {answer.verificationStatus === 'needs_confirmation' ? 'Needs confirmation' : 'Confirmed'}
+            {answer.verificationStatus === 'needs_confirmation' ? 'Needs review' : 'Confirmed'}
           </span>
         )}
       </div>

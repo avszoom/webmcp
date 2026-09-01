@@ -99,6 +99,8 @@ export interface AgentAnswerInput {
   value: string
   sourceLabel: string
   confidence: number
+  requiresConfirmation?: boolean
+  overwritePending?: boolean
 }
 
 export interface AgentWriteResult {
@@ -157,12 +159,14 @@ export function applyAgentAnswersToState(
     }
 
     const existing = answers[entry.questionId]
-    if (existing?.value.trim().toLocaleLowerCase() === value.toLocaleLowerCase()) {
+    const sameValue = existing?.value.trim().toLocaleLowerCase() === value.toLocaleLowerCase()
+    const canReplacePending = entry.overwritePending && existing?.verificationStatus === 'needs_confirmation'
+    if (sameValue && !canReplacePending) {
       result.skipped.push(entry.questionId)
       continue
     }
 
-    if (existing?.value.trim() && existing.value.trim() !== value) {
+    if (existing?.value.trim() && !sameValue && !canReplacePending) {
       const conflictId = `conflict-${entry.questionId}`
       if (!conflicts.some((conflict) => conflict.id === conflictId)) {
         conflicts.push({
@@ -176,7 +180,7 @@ export function applyAgentAnswersToState(
       continue
     }
 
-    const needsConfirmation = question.sensitivity === 'sensitive'
+    const needsConfirmation = question.sensitivity === 'sensitive' || entry.requiresConfirmation === true
     answers[entry.questionId] = {
       value,
       source: 'agent',
@@ -192,7 +196,7 @@ export function applyAgentAnswersToState(
 
   const detailParts = [`${result.applied.length} answer${result.applied.length === 1 ? '' : 's'} added`]
   if (result.pendingConfirmation.length) {
-    detailParts.push(`${result.pendingConfirmation.length} waiting for confirmation`)
+    detailParts.push(`${result.pendingConfirmation.length} flagged for review`)
   }
   if (result.conflicts.length) detailParts.push(`${result.conflicts.length} conflict detected`)
 

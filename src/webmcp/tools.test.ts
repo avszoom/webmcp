@@ -184,21 +184,33 @@ describe('WebMCP semantic tool registry', () => {
     expect(harness.getState().answers.prior_refusal.verificationStatus).toBe('confirmed')
   })
 
-  it('records visibly approved agent proposals as user-confirmed WebMCP writes', async () => {
+  it('writes Terra proposals immediately, flags them, and accepts end-review corrections', async () => {
     const harness = createHarness(applicationReducer(createInitialState(), { type: 'START', mode: 'personal' }))
     await harness.execute('select_application_flow', {
       purpose: 'family_visit', funding: 'self', prior_visit: 'yes',
     })
-    const response = await harness.execute('provide_interview_answers', {
-      source: 'user_confirmation',
-      answers: [{ question_id: 'job_title', value: 'Software Engineer', confidence: 1 }],
+    const proposed = await harness.execute('provide_interview_answers', {
+      source: 'agent_proposal',
+      answers: [{ question_id: 'job_title', value: 'Software Engineer', confidence: 0.86 }],
     }) as { isError?: boolean }
 
-    expect(response.isError).not.toBe(true)
+    expect(proposed.isError).not.toBe(true)
     expect(harness.getState().answers.job_title).toMatchObject({
       value: 'Software Engineer',
-      sourceLabel: 'User-confirmed agent proposal',
-      confidence: 1,
+      sourceLabel: 'Terra proposal · review at end',
+      confidence: 0.86,
+      verificationStatus: 'needs_confirmation',
+    })
+
+    const confirmed = await harness.execute('provide_interview_answers', {
+      source: 'user_confirmation',
+      answers: [{ question_id: 'job_title', value: 'Senior Software Engineer', confidence: 1 }],
+    }) as { isError?: boolean }
+
+    expect(confirmed.isError).not.toBe(true)
+    expect(harness.getState().answers.job_title).toMatchObject({
+      value: 'Senior Software Engineer',
+      sourceLabel: 'User-confirmed Terra proposal',
       verificationStatus: 'confirmed',
     })
   })

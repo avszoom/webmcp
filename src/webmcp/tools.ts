@@ -697,14 +697,14 @@ export function createVisaApplicationTools(runtime: ToolRuntime): WebMcpToolDefi
     {
       name: 'provide_interview_answers',
       title: 'Apply adaptive interview answers',
-      description: 'Apply one or more facts stated during the adaptive interview or explicitly approved from a visible agent proposal. The website validates field IDs, dates, enumerated choices, applicability, provenance, and sensitive confirmation status before writing anything.',
+      description: 'Apply facts stated during the adaptive interview, reviewable Terra proposals, or user-confirmed corrections. The website validates field IDs, dates, choices, applicability, provenance, and review status before every write.',
       inputSchema: {
         type: 'object',
         properties: {
           source: {
             type: 'string',
-            enum: ['user_statement', 'user_confirmation', 'document'],
-            description: 'Use user_statement for spoken or typed facts, user_confirmation only after the user approves a visible candidate, and document only for a fictional evidence reference the user explicitly approved.',
+            enum: ['user_statement', 'agent_proposal', 'user_confirmation', 'document'],
+            description: 'Use user_statement for spoken or typed facts, agent_proposal for a reasonable Terra interpretation that is written now and flagged for end review, user_confirmation for end-review approval or correction, and document only for a fictional evidence reference the user explicitly approved.',
           },
           answers: {
             type: 'array',
@@ -735,8 +735,8 @@ export function createVisaApplicationTools(runtime: ToolRuntime): WebMcpToolDefi
         const errors: string[] = []
         const entries: AgentAnswerInput[] = []
 
-        if (!['user_statement', 'user_confirmation', 'document'].includes(source)) {
-          errors.push('source must be user_statement, user_confirmation, or document.')
+        if (!['user_statement', 'agent_proposal', 'user_confirmation', 'document'].includes(source)) {
+          errors.push('source must be user_statement, agent_proposal, user_confirmation, or document.')
         }
         if (!rawAnswers.length || rawAnswers.length > 30) {
           errors.push('answers must contain between 1 and 30 facts.')
@@ -756,8 +756,9 @@ export function createVisaApplicationTools(runtime: ToolRuntime): WebMcpToolDefi
             errors.push(`${questionId} must contain an explicitly known value.`)
             continue
           }
-          if (confidence < 0.7 || confidence > 1) {
-            errors.push(`${questionId} confidence must be between 0.7 and 1.`)
+          const minimumConfidence = source === 'agent_proposal' ? 0.5 : 0.7
+          if (confidence < minimumConfidence || confidence > 1) {
+            errors.push(`${questionId} confidence must be between ${minimumConfidence} and 1.`)
             continue
           }
           if (question.type === 'date' && !isDate(value)) {
@@ -778,9 +779,13 @@ export function createVisaApplicationTools(runtime: ToolRuntime): WebMcpToolDefi
             sourceLabel: source === 'document'
               ? 'Connected fictional evidence'
               : source === 'user_confirmation'
-                ? 'User-confirmed agent proposal'
-                : 'User statement (LLM extracted)',
+                ? 'User-confirmed Terra proposal'
+                : source === 'agent_proposal'
+                  ? 'Terra proposal · review at end'
+                  : 'User statement (LLM extracted)',
             confidence,
+            requiresConfirmation: source === 'agent_proposal',
+            overwritePending: source === 'user_confirmation',
           })
         }
 
@@ -799,8 +804,9 @@ export function createVisaApplicationTools(runtime: ToolRuntime): WebMcpToolDefi
           'Adaptive interview facts applied',
         )
         runtime.commitState(outcome.state)
+        const appliedKind = source === 'agent_proposal' ? 'reviewable Terra proposal' : 'interview fact'
         return toolResponse(
-          `${outcome.result.applied.length} approved interview fact${outcome.result.applied.length === 1 ? '' : 's'} passed website validation and were applied.`,
+          `${outcome.result.applied.length} ${appliedKind}${outcome.result.applied.length === 1 ? '' : 's'} passed website validation and were applied.`,
           { ok: true, ...outcome.result, application_status: statusPayload(outcome.state) },
         )
       },

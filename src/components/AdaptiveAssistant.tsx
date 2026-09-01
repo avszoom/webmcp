@@ -79,7 +79,7 @@ const initialFastIntakeIds = [
 
 const content = {
   en: {
-    greeting: 'This application is deliberately long, but we can finish the applicable path together. I only use facts you state, remove questions that do not apply, and show every WebMCP action.',
+    greeting: 'This application is deliberately long, but we can finish the applicable path together. I’ll fill stated and reasonably derived values now, flag uncertainty for one final review, and show every WebMCP action.',
     privacy: 'Your answer is sent to OpenAI for planning. The API key stays server-side, every value is validated by this website, and nothing is submitted.',
     startVoice: 'Start with voice', type: 'Type instead', later: 'Not now',
     trip: 'Imagine you’re telling a friend about this trip. Take me from home to the United States—what is the plan, and what makes you want to go?',
@@ -131,9 +131,8 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   const [currentQuestionIds, setCurrentQuestionIds] = useState<string[]>(initialFastIntakeIds)
   const [interviewHistory, setInterviewHistory] = useState<InterviewHistoryTurn[]>([])
   const [partialFacts, setPartialFacts] = useState<InterviewPartialFact[]>([])
-  const [pendingCandidates, setPendingCandidates] = useState<InterviewCandidate[]>([])
-  const [candidateEdits, setCandidateEdits] = useState<Record<string, string>>({})
-  const [selectedCandidateIds, setSelectedCandidateIds] = useState<Set<string>>(new Set())
+  const [attentionReviewOpen, setAttentionReviewOpen] = useState(false)
+  const [attentionEdits, setAttentionEdits] = useState<Record<string, string>>({})
   const [voiceEnabled, setVoiceEnabled] = useState(false)
   const [speaking, setSpeaking] = useState(false)
   const [turnNumber, setTurnNumber] = useState(0)
@@ -145,7 +144,6 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   const transcriptRef = useRef<HTMLTextAreaElement | null>(null)
   const stageRef = useRef<InterviewStage>('intro')
   const voiceEnabledRef = useRef(false)
-  const pendingCandidatesRef = useRef<InterviewCandidate[]>([])
   const startListeningRef = useRef<() => void>(() => {})
   const processAnswerRef = useRef<(answer: string) => Promise<void>>(async () => {})
 
@@ -177,6 +175,24 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
 
   const route = state.flow
   const routePreview = useMemo(() => route ?? buildApplicationFlow('undetermined'), [route])
+  const attentionAnswers = useMemo(() => {
+    const applicable = new Set(routePreview.applicableQuestionIds)
+    return Object.entries(state.answers)
+      .filter(([questionId, answer]) => applicable.has(questionId) && answer.value.trim() && answer.verificationStatus === 'needs_confirmation')
+      .map(([questionId, answer]) => ({ questionId, answer, question: questionMap.get(questionId) }))
+  }, [routePreview.applicableQuestionIds, state.answers])
+
+  useEffect(() => {
+    if (!attentionAnswers.length) {
+      setAttentionReviewOpen(false)
+      return
+    }
+    setAttentionEdits((current) => Object.fromEntries(attentionAnswers.map(({ questionId, answer }) => [
+      questionId,
+      current[questionId] ?? answer.value,
+    ])))
+    if (currentChapter === 'final_review' || stage === 'complete') setAttentionReviewOpen(true)
+  }, [attentionAnswers, currentChapter, stage])
 
   const addMessage = (
     role: ChatMessage['role'],
@@ -287,6 +303,20 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
           },
         })
       }
+      if (candidates.length) {
+        calls.push({
+          toolName: 'provide_interview_answers',
+          label: 'Filling Terra proposals and flagging them for end review',
+          input: {
+            source: 'agent_proposal',
+            answers: candidates.map((candidate) => ({
+              question_id: candidate.question_id,
+              value: candidate.proposed_value,
+              confidence: candidate.confidence,
+            })),
+          },
+        })
+      }
 
       const applicableConfirmations = plan.confirm_question_ids.filter((questionId) => applicableIds.has(questionId))
       if (applicableConfirmations.length) {
@@ -306,10 +336,12 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
           .map(([questionId]) => questionId),
       )
       for (const update of updates) if (applicableIds.has(update.question_id)) projectedAnswerIds.add(update.question_id)
+      for (const candidate of candidates) projectedAnswerIds.add(candidate.question_id)
       const projectedValues = Object.fromEntries(
         Object.entries(state.answers).map(([questionId, value]) => [questionId, value.value]),
       )
       for (const update of updates) projectedValues[update.question_id] = update.value
+      for (const candidate of candidates) projectedValues[candidate.question_id] = candidate.proposed_value
       const derived = deriveInsightsFromValues(projectedValues).map(({ label, value }) => ({ label, value }))
       const progress: TurnProgress = {
         route: projectedFlow.labels.join(' → '),
@@ -361,10 +393,6 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       setTurnNumber((current) => current + 1)
       setInterviewHistory(nextHistory)
       setPartialFacts(nextPartialFacts)
-      setPendingCandidates(candidates)
-      pendingCandidatesRef.current = candidates
-      setCandidateEdits(Object.fromEntries(candidates.map((candidate) => [candidate.question_id, candidate.proposed_value])))
-      setSelectedCandidateIds(new Set(candidates.map((candidate) => candidate.question_id)))
       addMessage('agent', plan.assistant_message, plan.decision_summary, progress)
       setLastQuestion(nextQuestion)
       setCurrentQuestion(nextQuestion)
@@ -376,9 +404,9 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       ))
       setCurrentChapter(plan.next_chapter ?? currentChapter)
       const spokenTurn = candidates.length
-        ? `${plan.assistant_message} I have ${candidates.length} interpretation${candidates.length === 1 ? '' : 's'} for you to verify.`
+        ? `${plan.assistant_message} I filled ${candidates.length} reasonable interpretation${candidates.length === 1 ? '' : 's'} and flagged ${candidates.length === 1 ? 'it' : 'them'} for your final review. ${nextQuestion}`
         : `${plan.assistant_message} ${nextQuestion}`
-      window.setTimeout(() => speakText(spokenTurn, candidates.length === 0), 120)
+      window.setTimeout(() => speakText(spokenTurn, true), 120)
       if (plan.is_complete) {
         stageRef.current = 'complete'
         setStage('complete')
@@ -419,7 +447,6 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         listenAfter
         && voiceEnabledRef.current
         && stageRef.current === 'interview'
-        && pendingCandidatesRef.current.length === 0
       ) {
         window.setTimeout(() => startListeningRef.current(), 180)
       }
@@ -434,7 +461,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
     if (!next) {
       window.speechSynthesis?.cancel()
       setSpeaking(false)
-    } else if (currentQuestion && !pendingCandidatesRef.current.length) {
+    } else if (currentQuestion) {
       speakText(currentQuestion, false, true)
     }
   }
@@ -454,84 +481,47 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
     speakText(currentQuestion, false, true)
   }
 
-  const clearCandidateReview = () => {
-    setPendingCandidates([])
-    pendingCandidatesRef.current = []
-    setCandidateEdits({})
-    setSelectedCandidateIds(new Set())
-  }
-
-  const confirmCandidates = async () => {
-    const approved = pendingCandidates.filter((candidate) => selectedCandidateIds.has(candidate.question_id))
-    if (!approved.length || working) return
+  const confirmAttentionQueue = async () => {
+    if (!attentionAnswers.length || working) return
     setWorking(true)
     setWorkPhase('executing')
-    setWorkingLabel('Applying the interpretations you approved')
+    setWorkingLabel('Saving your final review')
     setPlannerError(null)
     try {
-      const confirmedValues = approved.map((candidate) => ({
-        question_id: candidate.question_id,
-        value: (candidateEdits[candidate.question_id] ?? candidate.proposed_value).trim(),
+      const confirmedValues = attentionAnswers.map(({ questionId, answer }) => ({
+        question_id: questionId,
+        value: (attentionEdits[questionId] ?? answer.value).trim(),
         confidence: 1,
       }))
       const calls: PrefillToolCall[] = [{
         toolName: 'provide_interview_answers',
-        label: 'Writing your confirmed interpretations with WebMCP',
+        label: 'Saving reviewed values with WebMCP',
         input: { source: 'user_confirmation', answers: confirmedValues },
       }]
-      const sensitiveIds = approved
-        .map((candidate) => candidate.question_id)
+      const sensitiveIds = attentionAnswers
+        .map(({ questionId }) => questionId)
         .filter((questionId) => questionMap.get(questionId)?.sensitivity === 'sensitive')
       if (sensitiveIds.length) {
         calls.push({
           toolName: 'confirm_sensitive_answers',
-          label: 'Recording your explicit confirmation of sensitive values',
+          label: 'Recording explicit confirmation of sensitive values',
           input: { question_ids: sensitiveIds, explicit_confirmation: true },
         })
       }
       await runCalls(calls)
-      const deferredFacts: InterviewPartialFact[] = pendingCandidates
-        .filter((candidate) => !selectedCandidateIds.has(candidate.question_id))
-        .map((candidate) => ({
-          question_id: candidate.question_id,
-          value: candidateEdits[candidate.question_id] ?? candidate.proposed_value,
-          evidence_text: candidate.evidence_text,
-          missing_detail: 'your confirmation or correction',
-          clarification_question: candidate.verification_prompt,
-        }))
-      setPartialFacts((current) => mergePartialFacts(
-        current.filter((fact) => !approved.some((candidate) => candidate.question_id === fact.question_id)),
-        deferredFacts,
-        approved.map((candidate) => candidate.question_id),
-      ))
-      clearCandidateReview()
+      setAttentionReviewOpen(false)
       addMessage(
         'agent',
-        `${approved.length} interpretation${approved.length === 1 ? ' was' : 's were'} confirmed and applied.`,
-        'Your approval converted visible proposals into verified WebMCP writes.',
+        `${attentionAnswers.length} flagged value${attentionAnswers.length === 1 ? ' is' : 's are'} now reviewed.`,
+        'Your corrections and approvals were written through WebMCP.',
       )
-      if (currentQuestion) window.setTimeout(() => speakText(currentQuestion, true), 120)
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'The confirmed values could not be applied.'
+      const message = error instanceof Error ? error.message : 'The review could not be saved.'
       setPlannerError(message)
-      addMessage('agent', `${message} Please correct the highlighted proposals and try again.`)
+      addMessage('agent', `${message} Please check the flagged values and try again.`)
     } finally {
       setWorking(false)
     }
-  }
-
-  const discardCandidates = () => {
-    const deferredFacts: InterviewPartialFact[] = pendingCandidates.map((candidate) => ({
-      question_id: candidate.question_id,
-      value: candidateEdits[candidate.question_id] ?? candidate.proposed_value,
-      evidence_text: candidate.evidence_text,
-      missing_detail: 'your confirmation or correction',
-      clarification_question: candidate.verification_prompt,
-    }))
-    setPartialFacts((current) => mergePartialFacts(current, deferredFacts, []))
-    clearCandidateReview()
-    addMessage('agent', 'No proposed values were written. I kept them only as unresolved notes for later.')
-    if (currentQuestion) window.setTimeout(() => speakText(currentQuestion, true), 120)
   }
 
   const begin = (withVoice: boolean) => {
@@ -544,7 +534,8 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
     setCurrentQuestionIds(initialFastIntakeIds)
     setInterviewHistory([])
     setPartialFacts([])
-    clearCandidateReview()
+    setAttentionReviewOpen(false)
+    setAttentionEdits({})
     voiceEnabledRef.current = withVoice
     setVoiceEnabled(withVoice)
     if (withVoice) window.setTimeout(() => speakText(copy.trip, true, true), 120)
@@ -598,7 +589,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       addMessage('agent', 'Voice input is unavailable in this browser. You can type the same answer below.')
       return
     }
-    if (keepListeningRef.current || pendingCandidatesRef.current.length) return
+    if (keepListeningRef.current) return
     window.speechSynthesis?.cancel()
     setSpeaking(false)
     committedTranscriptRef.current = draft.trim()
@@ -674,36 +665,29 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         {stage === 'complete' && (
           <div className="assistant-result">
             <CheckIcon />
-            <div><strong>{metrics.completed} of {metrics.total} applicable questions completed</strong><span>{metrics.needsConfirmation} confirmations · {metrics.evidenceNeeded} evidence items · {metrics.conflicts} conflicts remain</span></div>
+            <div><strong>{metrics.completed} of {metrics.total} applicable questions completed</strong><span>{metrics.needsConfirmation} flagged reviews · {metrics.evidenceNeeded} evidence items · {metrics.conflicts} conflicts remain</span></div>
           </div>
         )}
       </div>
 
-      {stage === 'interview' && working && !currentQuestion && !pendingCandidates.length && <NextQuestionLoading />}
+      {stage === 'interview' && working && !currentQuestion && <NextQuestionLoading />}
 
-      {stage === 'interview' && pendingCandidates.length > 0 && (
-        <CandidateReviewCard
-          candidates={pendingCandidates}
-          edits={candidateEdits}
-          selectedIds={selectedCandidateIds}
+      {attentionReviewOpen && attentionAnswers.length > 0 && (
+        <AttentionReviewCard
+          answers={attentionAnswers}
+          edits={attentionEdits}
           working={working}
-          onEdit={(questionId, value) => setCandidateEdits((current) => ({ ...current, [questionId]: value }))}
-          onToggle={(questionId) => setSelectedCandidateIds((current) => {
-            const next = new Set(current)
-            if (next.has(questionId)) next.delete(questionId)
-            else next.add(questionId)
-            return next
-          })}
-          onConfirm={() => void confirmCandidates()}
-          onDiscard={discardCandidates}
+          onEdit={(questionId, value) => setAttentionEdits((current) => ({ ...current, [questionId]: value }))}
+          onConfirm={() => void confirmAttentionQueue()}
+          onClose={() => setAttentionReviewOpen(false)}
         />
       )}
 
-      {stage === 'interview' && !working && !pendingCandidates.length && currentQuestion && (
+      {stage === 'interview' && !working && currentQuestion && (
         <CurrentQuestionCard locale={locale} question={currentQuestion} chapter={currentChapter} speaking={speaking} onReplay={replayCurrentQuestion} />
       )}
 
-      {stage === 'interview' && !pendingCandidates.length && (
+      {stage === 'interview' && (
         <div className="assistant-composer">
           <div>
             <button className={`voice-button ${listening ? 'voice-button--listening' : ''}`} onClick={listening ? stopListening : startListening} aria-label={listening ? 'Stop voice recording' : 'Answer by voice'} aria-pressed={listening}>{listening ? '■' : '●'}</button>
@@ -718,6 +702,11 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       )}
 
       <div className="assistant-footer-actions">
+        {attentionAnswers.length > 0 && (
+          <button className="assistant-review-toggle" onClick={() => setAttentionReviewOpen((value) => !value)} aria-expanded={attentionReviewOpen}>
+            <WarningIcon /> Review {attentionAnswers.length} flagged
+          </button>
+        )}
         <button className="assistant-activity-toggle" onClick={() => setActivityOpen((value) => !value)}>
           <span><SparkleIcon /> {copy.activity}</span><strong>{state.activity.length}</strong>
         </button>
@@ -747,66 +736,62 @@ function NextQuestionLoading() {
   )
 }
 
-function CandidateReviewCard({
-  candidates,
+function AttentionReviewCard({
+  answers,
   edits,
-  selectedIds,
   working,
   onEdit,
-  onToggle,
   onConfirm,
-  onDiscard,
+  onClose,
 }: {
-  candidates: InterviewCandidate[]
+  answers: Array<{
+    questionId: string
+    answer: { value: string; sourceLabel: string; confidence: number }
+    question: ReturnType<typeof questionMap.get>
+  }>
   edits: Record<string, string>
-  selectedIds: Set<string>
   working: boolean
   onEdit: (questionId: string, value: string) => void
-  onToggle: (questionId: string) => void
   onConfirm: () => void
-  onDiscard: () => void
+  onClose: () => void
 }) {
   return (
-    <section className="candidate-review" aria-live="polite" aria-label="Verify agent interpretations">
-      <div className="candidate-review__heading">
+    <section className="attention-review" aria-live="polite" aria-label="Review flagged values">
+      <div className="attention-review__heading">
         <SparkleIcon />
-        <div><strong>VERIFY MY UNDERSTANDING</strong><span>Terra constructed these values. Nothing below is written until you approve it.</span></div>
+        <div><strong>FINAL ATTENTION QUEUE</strong><span>These values are already in the application. Correct anything Terra interpreted imperfectly, then approve once.</span></div>
+        <button onClick={onClose} aria-label="Close final attention queue"><XIcon /></button>
       </div>
-      <div className="candidate-review__list">
-        {candidates.map((candidate) => {
-          const question = questionMap.get(candidate.question_id)
-          const selected = selectedIds.has(candidate.question_id)
+      <div className="attention-review__list">
+        {answers.map(({ questionId, answer, question }) => {
           const options = question?.type === 'yes-no' ? ['Yes', 'No'] : question?.options
           return (
-            <div className={`candidate-review__item ${selected ? 'is-selected' : ''}`} key={candidate.question_id}>
-              <input type="checkbox" checked={selected} onChange={() => onToggle(candidate.question_id)} aria-label={`Approve ${question?.label ?? candidate.question_id}`} />
-              <span className="candidate-review__copy">
-                <strong>{question?.label ?? candidate.question_id}</strong>
-                <small>{candidate.verification_prompt}</small>
+            <label className="attention-review__item" key={questionId}>
+              <span className="attention-review__copy">
+                <strong>{question?.label ?? questionId}<em>NEEDS REVIEW</em></strong>
+                <small>{answer.sourceLabel} · {Math.round(answer.confidence * 100)}% confidence</small>
                 {options ? (
-                  <select aria-label={`Proposed ${question?.label ?? candidate.question_id}`} value={edits[candidate.question_id] ?? candidate.proposed_value} onChange={(event) => onEdit(candidate.question_id, event.target.value)} disabled={!selected || working}>
+                  <select aria-label={`Review ${question?.label ?? questionId}`} value={edits[questionId] ?? answer.value} onChange={(event) => onEdit(questionId, event.target.value)} disabled={working}>
                     {options.map((option) => <option key={option} value={option}>{option}</option>)}
                   </select>
                 ) : (
                   <input
                     type={question?.type === 'date' ? 'date' : 'text'}
-                    aria-label={`Proposed ${question?.label ?? candidate.question_id}`}
-                    value={edits[candidate.question_id] ?? candidate.proposed_value}
-                    onChange={(event) => onEdit(candidate.question_id, event.target.value)}
-                    disabled={!selected || working}
+                    aria-label={`Review ${question?.label ?? questionId}`}
+                    value={edits[questionId] ?? answer.value}
+                    onChange={(event) => onEdit(questionId, event.target.value)}
+                    disabled={working}
                   />
                 )}
-                <em>{candidate.explanation} · {Math.round(candidate.confidence * 100)}% model confidence</em>
               </span>
-            </div>
+            </label>
           )
         })}
       </div>
-      <div className="candidate-review__actions">
-        <button onClick={onConfirm} disabled={working || selectedIds.size === 0}><CheckIcon /> {working ? 'Applying…' : `Confirm ${selectedIds.size} selected`}</button>
-        <button onClick={onDiscard} disabled={working}>None are correct</button>
+      <div className="attention-review__actions">
+        <button onClick={onConfirm} disabled={working}><CheckIcon /> {working ? 'Saving…' : `Save corrections & approve ${answers.length}`}</button>
       </div>
-      <small className="candidate-review__trust"><LockIcon /> Visible approval turns proposals into validated WebMCP writes.</small>
+      <small className="attention-review__trust"><LockIcon /> No proposal is hidden: every flagged value remains editable before review.</small>
     </section>
   )
 }
@@ -831,7 +816,7 @@ function TurnProgressCard({ progress }: { progress: TurnProgress }) {
       {progress.skippedFields.length > 0 && <div className="turn-progress__skipped"><CheckIcon /><span><strong>{progress.skippedFields.length} details no longer needed</strong>{progress.skippedFields.slice(0, 3).join(' · ')} were excluded after the route changed</span></div>}
       <div className="turn-progress__route"><CheckIcon /><span><strong>{progress.fields.length ? `${progress.fields.length} verified field${progress.fields.length === 1 ? '' : 's'} filled` : 'No unverified fields added'}</strong>{progress.fields.length ? progress.fields.slice(0, 4).join(' · ') : 'Waiting for an explicit answer'}</span></div>
       {progress.inferredFields.slice(0, 3).map((field) => <div className="turn-progress__inferred" key={field.label}><SparkleIcon /><span><strong>{field.label}: {field.value}</strong>{field.explanation} · reviewable</span></div>)}
-      {progress.candidateFields.length > 0 && <div className="turn-progress__candidates"><SparkleIcon /><span><strong>{`${progress.candidateFields.length} interpretation${progress.candidateFields.length === 1 ? '' : 's'} ready to verify`}</strong>{progress.candidateFields.slice(0, 3).map((field) => `${field.label}: ${field.value}`).join(' · ')}</span></div>}
+      {progress.candidateFields.length > 0 && <div className="turn-progress__candidates"><SparkleIcon /><span><strong>{`${progress.candidateFields.length} Terra proposal${progress.candidateFields.length === 1 ? '' : 's'} filled · flagged for end review`}</strong>{progress.candidateFields.slice(0, 3).map((field) => `${field.label}: ${field.value}`).join(' · ')}</span></div>}
       {progress.rememberedFacts.length > 0 && <div className="turn-progress__remembered"><SparkleIcon /><span><strong>{`${progress.rememberedFacts.length} incomplete detail${progress.rememberedFacts.length === 1 ? '' : 's'} remembered`}</strong>{progress.rememberedFacts.slice(0, 3).map((fact) => `${fact.label}: ${fact.value} (${fact.missingDetail})`).join(' · ')}</span></div>}
       {progress.derived.slice(0, 2).map((insight) => <div className="turn-progress__derived" key={insight.label}><SparkleIcon /><span><strong>{insight.value}</strong>{insight.label} · derived from stated facts</span></div>)}
       <div className="turn-progress__trust"><LockIcon /> Stated and derived values stay visibly separate · {progress.actions} WebMCP actions</div>

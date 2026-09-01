@@ -211,7 +211,7 @@ describe('WebMcpProvider', () => {
     expect(screen.queryByRole('region', { name: 'Finding the next question' })).not.toBeInTheDocument()
   })
 
-  it('keeps Terra proposals out of the form until the user confirms or corrects them', async () => {
+  it('fills Terra proposals immediately and collects them in one non-blocking review queue', async () => {
     const { definitions, executeTool } = installExecutableModelContext()
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({
       plan: {
@@ -245,26 +245,32 @@ describe('WebMcpProvider', () => {
     fireEvent.change(screen.getByPlaceholderText('Speak or type naturally…'), { target: { value: 'I am visiting my brother in New York and I work in software engineering.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-    const review = await screen.findByRole('region', { name: 'Verify agent interpretations' })
-    expect(review).toHaveTextContent('Nothing below is written until you approve it')
-    const beforeConfirmation = executeTool.mock.calls
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Review 1 flagged' })).toBeInTheDocument())
+    const beforeReview = executeTool.mock.calls
       .filter(([tool]) => tool.name === 'provide_interview_answers')
       .map(([, input]) => JSON.parse(input) as { source: string; answers: Array<{ question_id: string }> })
-    expect(beforeConfirmation).toHaveLength(1)
-    expect(beforeConfirmation[0].answers.map((answer) => answer.question_id)).not.toContain('job_title')
+    expect(beforeReview).toHaveLength(2)
+    expect(beforeReview.at(-1)).toMatchObject({
+      source: 'agent_proposal',
+      answers: [{ question_id: 'job_title' }],
+    })
+    expect(screen.getByRole('region', { name: 'Current question' })).toHaveTextContent('work journey')
 
-    fireEvent.change(screen.getByLabelText('Proposed Job title'), { target: { value: 'Senior Software Engineer' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Confirm 1 selected' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Review 1 flagged' }))
+    const review = screen.getByRole('region', { name: 'Review flagged values' })
+    expect(review).toHaveTextContent('already in the application')
+    fireEvent.change(screen.getByLabelText('Review Job title'), { target: { value: 'Senior Software Engineer' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Save corrections & approve 1' }))
 
-    await waitFor(() => expect(screen.queryByRole('region', { name: 'Verify agent interpretations' })).not.toBeInTheDocument())
-    const afterConfirmation = executeTool.mock.calls
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Review flagged values' })).not.toBeInTheDocument())
+    const afterReview = executeTool.mock.calls
       .filter(([tool]) => tool.name === 'provide_interview_answers')
       .map(([, input]) => JSON.parse(input) as { source: string; answers: Array<{ question_id: string; value: string }> })
-    expect(afterConfirmation.at(-1)).toMatchObject({
+    expect(afterReview.at(-1)).toMatchObject({
       source: 'user_confirmation',
       answers: [{ question_id: 'job_title', value: 'Senior Software Engineer' }],
     })
-    expect(screen.getByRole('region', { name: 'Current question' })).toHaveTextContent('work journey')
+    expect(screen.queryByRole('button', { name: 'Review 1 flagged' })).not.toBeInTheDocument()
   })
 
   it('keeps voice capture open through final speech until the user presses stop', async () => {

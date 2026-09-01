@@ -2520,8 +2520,11 @@ textarea:focus-visible {
 .turn-progress__trust { padding-top: 8px; display: flex; align-items: center; gap: 5px; color: #3c6355; font-size: 8px; font-weight: 700; }
 .turn-progress__trust svg { width: 12px; flex: 0 0 auto; }
 
-.assistant-footer-actions { min-height: 42px; display: grid; grid-template-columns: minmax(0, 1fr) auto; background: #fff; border-top: 1px solid #d6d7d9; }
+.assistant-footer-actions { min-height: 42px; display: flex; background: #fff; border-top: 1px solid #d6d7d9; }
+.assistant-review-toggle { min-height: 41px; padding: 0 11px; display: inline-flex; align-items: center; gap: 5px; color: #7a4100; background: #fff4ce; border: 0; border-right: 1px solid #e5c365; cursor: pointer; font-size: 9px; font-weight: 800; white-space: nowrap; }
+.assistant-review-toggle svg { width: 13px; }
 .assistant-activity-toggle { min-width: 0; min-height: 41px; padding: 0 13px; display: flex; align-items: center; justify-content: space-between; color: #162e51; background: #fff; border: 0; cursor: pointer; font-size: 10px; font-weight: 700; }
+.assistant-footer-actions .assistant-activity-toggle { flex: 1 1 auto; }
 .assistant-activity-toggle span { display: flex; align-items: center; gap: 5px; }
 .assistant-activity-toggle svg { width: 14px; }
 .assistant-activity-toggle strong { min-width: 23px; padding: 3px 5px; color: #fff; background: #005ea8; border-radius: 10px; }
@@ -3056,30 +3059,27 @@ textarea:focus-visible {
 .assistant-next-question--loading p { color: rgba(241, 250, 255, .8); font-weight: 600; }
 .assistant-next-question--loading svg { animation: assistant-question-pulse 1.25s ease-in-out infinite; }
 @keyframes assistant-question-pulse { 0%, 100% { opacity: .45; transform: scale(.88); } 50% { opacity: 1; transform: scale(1.08); } }
-.candidate-review { position: relative; flex: 0 0 auto; margin: 0 14px; padding: 13px; color: #fff; background: linear-gradient(145deg, rgba(17, 94, 142, .92), rgba(61, 43, 126, .92)); border: 1px solid rgba(143, 225, 255, .62); border-radius: 16px; box-shadow: 0 15px 38px rgba(0, 12, 38, .3); }
-.candidate-review__heading { display: grid; grid-template-columns: auto 1fr; gap: 8px; }
-.candidate-review__heading > svg { width: 17px; color: #92e7ff; }
-.candidate-review__heading strong, .candidate-review__heading span { display: block; }
-.candidate-review__heading strong { color: #fff; font-size: 10px; letter-spacing: .12em; }
-.candidate-review__heading span { margin-top: 3px; color: rgba(233,248,255,.72); font-size: 9px; line-height: 1.35; }
-.candidate-review__list { margin-top: 10px; display: grid; gap: 8px; max-height: 245px; overflow-y: auto; }
-.candidate-review__item { padding: 9px; display: grid; grid-template-columns: auto minmax(0,1fr); gap: 8px; align-items: start; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12); border-radius: 11px; opacity: .62; }
-.candidate-review__item.is-selected { background: rgba(89, 210, 255, .12); border-color: rgba(143, 225, 255, .4); opacity: 1; }
-.candidate-review__item > input[type='checkbox'] { width: 16px; height: 16px; margin: 2px 0 0; accent-color: #52c7f4; }
-.candidate-review__copy { min-width: 0; }
-.candidate-review__copy > strong, .candidate-review__copy > small, .candidate-review__copy > em { display: block; }
-.candidate-review__copy > strong { color: #fff; font-size: 11px; }
-.candidate-review__copy > small { margin-top: 2px; color: #aeeaff; font-size: 9px; line-height: 1.35; }
-.candidate-review__copy > input, .candidate-review__copy > select { width: 100%; margin-top: 7px; padding: 8px 9px; color: #0f2744; background: #f8fcff; border: 1px solid rgba(188,229,247,.8); border-radius: 8px; font: 600 11px Arial, sans-serif; }
-.candidate-review__copy > input:disabled, .candidate-review__copy > select:disabled { opacity: .55; }
-.candidate-review__copy > em { margin-top: 5px; color: rgba(232,247,255,.63); font-size: 8px; font-style: normal; line-height: 1.35; }
-.candidate-review__actions { margin-top: 10px; display: grid; grid-template-columns: 1fr auto; gap: 7px; }
-.candidate-review__actions button { min-height: 36px; padding: 8px 10px; color: #fff; background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.22); border-radius: 9px; font-size: 10px; font-weight: 800; cursor: pointer; }
-.candidate-review__actions button:first-child { display: flex; align-items: center; justify-content: center; gap: 5px; color: #082640; background: linear-gradient(90deg, #8ee9ff, #8bf0c0); border: 0; }
-.candidate-review__actions button svg { width: 14px; }
-.candidate-review__actions button:disabled { cursor: not-allowed; opacity: .5; }
-.candidate-review__trust { margin-top: 8px; display: flex; align-items: center; gap: 5px; color: rgba(232,247,255,.62); font-size: 8px; }
-.candidate-review__trust svg { width: 12px; }
+.attention-review { position: relative; flex: 0 0 auto; margin: 0 14px; padding: 13px; color: #fff; background: linear-gradient(145deg, rgba(93, 53, 4, .94), rgba(72, 37, 112, .94)); border: 1px solid rgba(255, 211, 111, .68); border-radius: 16px; box-shadow: 0 15px 38px rgba(0, 12, 38, .3); }
+.attention-review__heading { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; }
+.attention-review__heading > svg { width: 17px; color: #ffd87c; }
+.attention-review__heading > button { width: 26px; height: 26px; padding: 5px; color: rgba(255,255,255,.75); background: rgba(255,255,255,.08); border: 0; border-radius: 50%; cursor: pointer; }
+.attention-review__heading strong, .attention-review__heading span { display: block; }
+.attention-review__heading strong { color: #fff; font-size: 10px; letter-spacing: .12em; }
+.attention-review__heading span { margin-top: 3px; color: rgba(255,247,225,.74); font-size: 9px; line-height: 1.35; }
+.attention-review__list { margin-top: 10px; display: grid; gap: 8px; max-height: 245px; overflow-y: auto; }
+.attention-review__item { padding: 9px; display: block; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); border-radius: 11px; }
+.attention-review__copy { min-width: 0; }
+.attention-review__copy > strong, .attention-review__copy > small { display: block; }
+.attention-review__copy > strong { color: #fff; font-size: 11px; }
+.attention-review__copy > strong em { float: right; color: #ffe093; font-size: 8px; font-style: normal; letter-spacing: .08em; }
+.attention-review__copy > small { margin-top: 3px; color: #ffe7ad; font-size: 8px; line-height: 1.35; }
+.attention-review__copy > input, .attention-review__copy > select { width: 100%; margin-top: 7px; padding: 8px 9px; color: #0f2744; background: #fffdf7; border: 1px solid rgba(255,222,145,.85); border-radius: 8px; font: 600 11px Arial, sans-serif; }
+.attention-review__actions { margin-top: 10px; }
+.attention-review__actions button { width: 100%; min-height: 38px; padding: 8px 10px; display: flex; align-items: center; justify-content: center; gap: 6px; color: #312000; background: linear-gradient(90deg, #ffe08c, #8bf0c0); border: 0; border-radius: 9px; font-size: 10px; font-weight: 800; cursor: pointer; }
+.attention-review__actions button svg { width: 14px; }
+.attention-review__actions button:disabled { cursor: not-allowed; opacity: .5; }
+.attention-review__trust { margin-top: 8px; display: flex; align-items: center; gap: 5px; color: rgba(255,247,225,.66); font-size: 8px; }
+.attention-review__trust svg { width: 12px; }
 .turn-progress__inferred { padding: 7px; display: grid; grid-template-columns: auto 1fr; gap: 7px; color: #eaf9ff; background: rgba(75, 170, 255, .13); border: 1px solid rgba(119, 209, 255, .2); border-radius: 9px; }
 .turn-progress__inferred > svg { width: 14px; color: #8fe4ff; }
 .turn-progress__inferred span { display: block; color: rgba(231,246,255,.72); font-size: 8px; line-height: 1.4; }
@@ -3133,6 +3133,7 @@ textarea:focus-visible {
 .assistant-glass-panel .voice-listening-hint { margin-left: 71px; color: #ffd8df; }
 
 .assistant-glass-panel .assistant-footer-actions { background: rgba(0,13,31,.24); border-color: rgba(255,255,255,.15); }
+.assistant-glass-panel .assistant-review-toggle { color: #ffe7a6; background: rgba(174, 105, 13, .24); border-color: rgba(255, 215, 125, .24); }
 .assistant-glass-panel .assistant-activity-toggle,
 .assistant-glass-panel .assistant-restart-button { color: rgba(238,248,255,.82); background: transparent; border-color: rgba(255,255,255,.15); }
 .assistant-glass-panel .assistant-activity { color: #1b1b1b; }
