@@ -343,7 +343,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   }
 
   return (
-    <section className="adaptive-assistant" role="dialog" aria-modal="true" aria-label="Application assistant">
+    <aside className="adaptive-assistant" role="dialog" aria-label="Application assistant">
       <div className="assistant-glass-panel">
       <header className="assistant-header">
         <span className="assistant-avatar assistant-orb"><BotIcon /></span>
@@ -433,7 +433,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         </div>
       )}
       </div>
-    </section>
+    </aside>
   )
 }
 

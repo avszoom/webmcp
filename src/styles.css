@@ -2909,33 +2909,39 @@ textarea:focus-visible {
 
 /* Voice-first glass assistant */
 .adaptive-assistant {
-  inset: 0;
-  width: auto;
+  inset: 104px 18px 18px auto;
+  width: min(460px, calc(100vw - 36px));
+  height: calc(100vh - 122px);
   max-height: none;
-  padding: clamp(14px, 3vw, 34px);
-  display: grid;
-  place-items: center;
+  padding: 0;
+  display: block;
   color: #fff;
-  background:
-    radial-gradient(circle at 50% 78%, rgba(33, 150, 243, .18), transparent 34%),
-    rgba(4, 18, 38, .38);
+  background: transparent;
   border: 0;
   border-radius: 0;
   box-shadow: none;
-  backdrop-filter: blur(7px) saturate(1.12);
+  backdrop-filter: none;
 }
 
 .assistant-glass-panel {
-  width: min(820px, calc(100vw - 28px));
-  max-height: calc(100vh - 32px);
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: linear-gradient(145deg, rgba(9, 35, 67, .88), rgba(13, 50, 79, .72));
+  background: linear-gradient(145deg, rgba(9, 35, 67, .84), rgba(13, 50, 79, .68));
   border: 1px solid rgba(255, 255, 255, .3);
-  border-radius: 28px;
-  box-shadow: 0 30px 100px rgba(0, 10, 30, .48), inset 0 1px rgba(255,255,255,.16);
+  border-radius: 24px;
+  box-shadow: 0 24px 70px rgba(0, 10, 30, .38), inset 0 1px rgba(255,255,255,.16);
   backdrop-filter: blur(28px) saturate(1.25);
+}
+
+@media (min-width: 1180px) {
+  .government-site:has(> .adaptive-assistant) {
+    padding-right: 496px;
+    transition: padding-right .22s ease;
+  }
 }
 
 .assistant-glass-panel .assistant-header {
@@ -3061,8 +3067,8 @@ textarea:focus-visible {
 .assistant-glass-panel .assistant-activity { color: #1b1b1b; }
 
 @media (max-width: 680px) {
-  .adaptive-assistant { inset: 0; width: auto; max-height: none; padding: 7px; }
-  .assistant-glass-panel { width: 100%; max-height: calc(100vh - 14px); border-radius: 20px; }
+  .adaptive-assistant { inset: 76px 7px 7px auto; width: calc(100vw - 14px); height: calc(100vh - 83px); max-height: none; padding: 0; }
+  .assistant-glass-panel { width: 100%; height: 100%; max-height: 100%; border-radius: 20px; }
   .assistant-glass-panel .assistant-header { min-height: 72px; padding: 10px 12px; }
   .assistant-orb { width: 46px; height: 46px; }
   .assistant-glass-panel .assistant-conversation { padding: 13px 11px 8px; }
