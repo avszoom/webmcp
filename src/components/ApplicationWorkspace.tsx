@@ -94,8 +94,8 @@ export function ApplicationWorkspace() {
             <section className="status-grid" aria-label="Application status">
               <div className="status-card status-card--primary"><span><CheckIcon /></span><div><strong>{metrics.completed}</strong><small>{t(language, 'completed')}</small></div><em>of {metrics.total}</em></div>
               <div className="status-card"><span><ClockGlyph /></span><div><strong>{metrics.missing}</strong><small>{t(language, 'missing')}</small></div></div>
-              <div className="status-card"><span><LockIcon /></span><div><strong>{metrics.needsConfirmation}</strong><small>{t(language, 'confirm')}</small></div></div>
-              <div className="status-card"><span><FileIcon /></span><div><strong>{metrics.evidenceNeeded}</strong><small>{t(language, 'evidence')}</small></div></div>
+              <div className="status-card"><span><LockIcon /></span><div><strong>{metrics.needsConfirmation}</strong><small>{t(language, 'confirm')}</small></div><em>{t(language, 'includedFilled')}</em></div>
+              <div className="status-card"><span><FileIcon /></span><div><strong>{metrics.evidenceNeeded}</strong><small>{t(language, 'evidence')}</small></div><em>{t(language, 'includedUnanswered')}</em></div>
             </section>
 
             {state.conflicts.length > 0 && (

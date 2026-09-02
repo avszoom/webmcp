@@ -79,7 +79,7 @@ describe('WebMcpProvider', () => {
       })
     })
 
-    await waitFor(() => expect(screen.getByRole('region', { name: 'Application status' })).toHaveTextContent('6Completed'))
+    await waitFor(() => expect(screen.getByRole('region', { name: 'Application status' })).toHaveTextContent('6Filled'))
     expect(screen.getByText('6 of 55 questions')).toBeInTheDocument()
   })
 
@@ -153,7 +153,7 @@ describe('WebMcpProvider', () => {
     fireEvent.change(screen.getByPlaceholderText('Speak or type naturally…'), { target: { value: 'I will pay myself. I work at Northstar Labs as a product designer and studied design' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
     await waitFor(() => expect(assistant).toHaveTextContent('Self-funded'), { timeout: 3000 })
-    expect(screen.getByRole('region', { name: 'Application status' })).not.toHaveTextContent('0Completed')
+    expect(screen.getByRole('region', { name: 'Application status' })).not.toHaveTextContent('0Filled')
     const executedTools = executeTool.mock.calls.map(([tool]) => tool.name)
     expect(executedTools).toEqual(expect.arrayContaining(['provide_interview_answers', 'derive_application_insights']))
     expect(executedTools).not.toEqual(expect.arrayContaining([
@@ -247,7 +247,7 @@ describe('WebMcpProvider', () => {
     fireEvent.change(screen.getByPlaceholderText('Speak or type naturally…'), { target: { value: 'I am visiting my brother in New York and I work in software engineering.' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Review 1 flagged' })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Review 1 filled values' })).toBeInTheDocument())
     const beforeReview = executeTool.mock.calls
       .filter(([tool]) => tool.name === 'provide_interview_answers')
       .map(([, input]) => JSON.parse(input) as { source: string; answers: Array<{ question_id: string }> })
@@ -258,11 +258,11 @@ describe('WebMcpProvider', () => {
     })
     expect(screen.getByRole('region', { name: 'Current question' })).toHaveTextContent('work journey')
 
-    fireEvent.click(screen.getByRole('button', { name: 'Review 1 flagged' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Review 1 filled values' }))
     const review = screen.getByRole('region', { name: 'Review flagged values' })
-    expect(review).toHaveTextContent('already in the application')
+    expect(review).toHaveTextContent('already filled')
     fireEvent.change(screen.getByLabelText('Review Job title'), { target: { value: 'Senior Software Engineer' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Save corrections & approve 1' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Save & continue 1' }))
 
     await waitFor(() => expect(screen.queryByRole('region', { name: 'Review flagged values' })).not.toBeInTheDocument())
     const afterReview = executeTool.mock.calls
@@ -272,7 +272,7 @@ describe('WebMcpProvider', () => {
       source: 'user_confirmation',
       answers: [{ question_id: 'job_title', value: 'Senior Software Engineer' }],
     })
-    expect(screen.queryByRole('button', { name: 'Review 1 flagged' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Review 1 filled values' })).not.toBeInTheDocument()
   })
 
   it('sends an attached document once and applies extracted facts as reviewable WebMCP writes', async () => {
@@ -304,7 +304,7 @@ describe('WebMcpProvider', () => {
     await waitFor(() => expect(screen.getByLabelText('Attached documents')).toHaveTextContent('resume.txt'))
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Review 1 flagged' })).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Review 1 filled values' })).toBeInTheDocument())
     const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as { attached_documents: Array<{ name: string; data: string }> }
     expect(request.attached_documents[0]).toMatchObject({ name: 'resume.txt' })
     expect(request.attached_documents[0].data).toBeTruthy()

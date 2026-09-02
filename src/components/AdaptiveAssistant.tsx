@@ -11,6 +11,7 @@ import {
   type InterviewPartialFact,
   type InterviewTurnPlan,
 } from '../agent/interview'
+import { createAnswerCalls, shouldAutoOpenAttentionReview } from '../agent/webMcpBatches'
 import { questions } from '../data/questions'
 import type { PrefillToolCall } from '../webmcp/demoCalls'
 import { useApplication } from '../state/ApplicationContext'
@@ -224,8 +225,13 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       questionId,
       current[questionId] ?? answer.value,
     ])))
-    if (currentChapter === 'final_review' || stage === 'complete') setAttentionReviewOpen(true)
-  }, [attentionAnswers, currentChapter, stage])
+    if (shouldAutoOpenAttentionReview({
+      chapter: currentChapter,
+      stage,
+      missing: metrics.missing,
+      attentionCount: attentionAnswers.length,
+    })) setAttentionReviewOpen(true)
+  }, [attentionAnswers, currentChapter, metrics.missing, stage])
 
   const addMessage = (
     role: ChatMessage['role'],
@@ -327,46 +333,37 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       const statementUpdates = updates.filter((update) => update.source === 'user_statement')
       const documentUpdates = updates.filter((update) => update.source === 'document')
       if (statementUpdates.length) {
-        calls.push({
-          toolName: 'provide_interview_answers',
-          label: 'Applying only facts stated in your answer',
-          input: {
-            source: 'user_statement',
-            answers: statementUpdates.map((update) => ({
-              question_id: update.question_id,
-              value: update.value,
-              confidence: update.confidence,
-            })),
-          },
-        })
+        calls.push(...createAnswerCalls(
+          'Applying only facts stated in your answer',
+          'user_statement',
+          statementUpdates.map((update) => ({
+            question_id: update.question_id,
+            value: update.value,
+            confidence: update.confidence,
+          })),
+        ))
       }
       if (documentUpdates.length) {
-        calls.push({
-          toolName: 'provide_interview_answers',
-          label: 'Extracting document facts and flagging them for end review',
-          input: {
-            source: 'document',
-            answers: documentUpdates.map((update) => ({
-              question_id: update.question_id,
-              value: update.value,
-              confidence: update.confidence,
-            })),
-          },
-        })
+        calls.push(...createAnswerCalls(
+          'Extracting document facts and flagging them for end review',
+          'document',
+          documentUpdates.map((update) => ({
+            question_id: update.question_id,
+            value: update.value,
+            confidence: update.confidence,
+          })),
+        ))
       }
       if (candidates.length) {
-        calls.push({
-          toolName: 'provide_interview_answers',
-          label: 'Filling Terra proposals and flagging them for end review',
-          input: {
-            source: 'agent_proposal',
-            answers: candidates.map((candidate) => ({
-              question_id: candidate.question_id,
-              value: candidate.proposed_value,
-              confidence: candidate.confidence,
-            })),
-          },
-        })
+        calls.push(...createAnswerCalls(
+          'Filling Terra proposals and flagging them for end review',
+          'agent_proposal',
+          candidates.map((candidate) => ({
+            question_id: candidate.question_id,
+            value: candidate.proposed_value,
+            confidence: candidate.confidence,
+          })),
+        ))
       }
 
       const applicableConfirmations = plan.confirm_question_ids.filter((questionId) => applicableIds.has(questionId))
@@ -377,10 +374,6 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
           input: { question_ids: applicableConfirmations, explicit_confirmation: true },
         })
       }
-      if (plan.is_complete) {
-        calls.push({ toolName: 'request_review', label: 'Checking readiness for human review', input: {} })
-      }
-
       const projectedAnswerIds = new Set(
         Object.entries(state.answers)
           .filter(([questionId, value]) => applicableIds.has(questionId) && value.value.trim())
@@ -388,6 +381,24 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       )
       for (const update of updates) if (applicableIds.has(update.question_id)) projectedAnswerIds.add(update.question_id)
       for (const candidate of candidates) projectedAnswerIds.add(candidate.question_id)
+      const projectedMissingIds = projectedFlow.applicableQuestionIds.filter((questionId) => !projectedAnswerIds.has(questionId))
+      const projectedPendingReviewIds = new Set(
+        Object.entries(state.answers)
+          .filter(([questionId, value]) => applicableIds.has(questionId) && value.verificationStatus === 'needs_confirmation')
+          .map(([questionId]) => questionId),
+      )
+      for (const update of statementUpdates) {
+        if (questionMap.get(update.question_id)?.sensitivity === 'sensitive') projectedPendingReviewIds.add(update.question_id)
+      }
+      for (const update of documentUpdates) projectedPendingReviewIds.add(update.question_id)
+      for (const candidate of candidates) projectedPendingReviewIds.add(candidate.question_id)
+      for (const questionId of applicableConfirmations) projectedPendingReviewIds.delete(questionId)
+      const locallyComplete = projectedMissingIds.length === 0
+        && projectedPendingReviewIds.size === 0
+        && state.conflicts.length === 0
+      if (plan.is_complete && locallyComplete) {
+        calls.push({ toolName: 'request_review', label: 'Checking readiness for human review', input: {} })
+      }
       const projectedValues = Object.fromEntries(
         Object.entries(state.answers).map(([questionId, value]) => [questionId, value.value]),
       )
@@ -434,6 +445,11 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         chapter: answeredChapter,
       }
       const nextHistory = [...interviewHistory, completedTurn].slice(-5)
+      const plannedFocusIds = plan.question_focus_ids?.length
+        ? plan.question_focus_ids
+        : plan.requested_question_ids
+      const nextFocusIds = (plannedFocusIds?.length ? plannedFocusIds : projectedMissingIds.slice(0, 5))
+        .filter((questionId) => applicableIds.has(questionId) && !projectedAnswerIds.has(questionId))
       const nextQuestion = chooseNovelQuestion({
         plan,
         history: interviewHistory,
@@ -441,7 +457,11 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         answeredChapter,
         answeredQuestionIds,
         partialFacts: nextPartialFacts,
-      })
+      }) || (nextFocusIds.length
+        ? `Before review, what should I enter for ${nextFocusIds
+            .map((questionId) => questionMap.get(questionId)?.label.toLowerCase() ?? questionId)
+            .join(', ')}?`
+        : '')
       setTurnNumber((current) => current + 1)
       setInterviewHistory(nextHistory)
       setPartialFacts(nextPartialFacts)
@@ -449,18 +469,13 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       addMessage('agent', plan.assistant_message, plan.decision_summary, progress)
       setLastQuestion(nextQuestion)
       setCurrentQuestion(nextQuestion)
-      const nextFocusIds = plan.question_focus_ids?.length
-        ? plan.question_focus_ids
-        : (plan.requested_question_ids ?? []).slice(0, 3)
-      setCurrentQuestionIds(nextFocusIds.filter((questionId) =>
-        applicableIds.has(questionId) && !projectedAnswerIds.has(questionId),
-      ))
+      setCurrentQuestionIds(nextFocusIds)
       setCurrentChapter(plan.next_chapter ?? currentChapter)
       const spokenTurn = candidates.length
         ? `${plan.assistant_message} I filled ${candidates.length} reasonable interpretation${candidates.length === 1 ? '' : 's'} and flagged ${candidates.length === 1 ? 'it' : 'them'} for your final review. ${nextQuestion}`
         : `${plan.assistant_message} ${nextQuestion}`
       window.setTimeout(() => speakText(spokenTurn, true), 120)
-      if (plan.is_complete) {
+      if (plan.is_complete && locallyComplete) {
         stageRef.current = 'complete'
         setStage('complete')
       }
@@ -592,11 +607,11 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         value: (attentionEdits[questionId] ?? answer.value).trim(),
         confidence: 1,
       }))
-      const calls: PrefillToolCall[] = [{
-        toolName: 'provide_interview_answers',
-        label: 'Saving reviewed values with WebMCP',
-        input: { source: 'user_confirmation', answers: confirmedValues },
-      }]
+      const calls = createAnswerCalls(
+        'Saving reviewed values with WebMCP',
+        'user_confirmation',
+        confirmedValues,
+      )
       const sensitiveIds = attentionAnswers
         .map(({ questionId }) => questionId)
         .filter((questionId) => questionMap.get(questionId)?.sensitivity === 'sensitive')
@@ -607,13 +622,24 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
           input: { question_ids: sensitiveIds, explicit_confirmation: true },
         })
       }
+      const readyAfterAttentionReview = metrics.missing === 0 && state.conflicts.length === 0
+      if (readyAfterAttentionReview) {
+        calls.push({ toolName: 'request_review', label: 'Checking final application readiness', input: {} })
+      }
       await runCalls(calls)
       setAttentionReviewOpen(false)
       addMessage(
         'agent',
-        `${attentionAnswers.length} flagged value${attentionAnswers.length === 1 ? ' is' : 's are'} now reviewed.`,
-        'Your corrections and approvals were written through WebMCP.',
+        readyAfterAttentionReview
+          ? `${attentionAnswers.length} flagged value${attentionAnswers.length === 1 ? ' is' : 's are'} reviewed. The application is ready for human review.`
+          : `${attentionAnswers.length} flagged value${attentionAnswers.length === 1 ? ' is' : 's are'} now reviewed. Continue with the unanswered fields below.`,
+        'Your corrections and approvals were written through WebMCP in safe batches.',
       )
+      if (readyAfterAttentionReview) {
+        stageRef.current = 'complete'
+        setStage('complete')
+        setCurrentQuestion('')
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'The review could not be saved.'
       setPlannerError(message)
@@ -776,6 +802,8 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
           answers={attentionAnswers}
           edits={attentionEdits}
           working={working}
+          isFinal={metrics.missing === 0}
+          remaining={metrics.missing}
           onEdit={(questionId, value) => setAttentionEdits((current) => ({ ...current, [questionId]: value }))}
           onConfirm={() => void confirmAttentionQueue()}
           onClose={() => setAttentionReviewOpen(false)}
@@ -832,7 +860,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       <div className="assistant-footer-actions">
         {attentionAnswers.length > 0 && (
           <button className="assistant-review-toggle" onClick={() => setAttentionReviewOpen((value) => !value)} aria-expanded={attentionReviewOpen}>
-            <WarningIcon /> Review {attentionAnswers.length} flagged
+            <WarningIcon /> Review {attentionAnswers.length} filled values
           </button>
         )}
         <button className="assistant-activity-toggle" onClick={() => setActivityOpen((value) => !value)}>
@@ -868,6 +896,8 @@ function AttentionReviewCard({
   answers,
   edits,
   working,
+  isFinal,
+  remaining,
   onEdit,
   onConfirm,
   onClose,
@@ -879,6 +909,8 @@ function AttentionReviewCard({
   }>
   edits: Record<string, string>
   working: boolean
+  isFinal: boolean
+  remaining: number
   onEdit: (questionId: string, value: string) => void
   onConfirm: () => void
   onClose: () => void
@@ -887,8 +919,10 @@ function AttentionReviewCard({
     <section className="attention-review" aria-live="polite" aria-label="Review flagged values">
       <div className="attention-review__heading">
         <SparkleIcon />
-        <div><strong>FINAL ATTENTION QUEUE</strong><span>These values are already in the application. Correct anything Terra interpreted imperfectly, then approve once.</span></div>
-        <button onClick={onClose} aria-label="Close final attention queue"><XIcon /></button>
+        <div><strong>{isFinal ? 'FINAL ATTENTION QUEUE' : 'REVIEW FILLED VALUES'}</strong><span>{isFinal
+          ? 'Every applicable field is filled. Correct anything Terra interpreted imperfectly, then approve once.'
+          : `These values are already filled. Approve or correct them now, then continue with ${remaining} unanswered field${remaining === 1 ? '' : 's'}.`}</span></div>
+        <button onClick={onClose} aria-label="Close review values"><XIcon /></button>
       </div>
       <div className="attention-review__list">
         {answers.map(({ questionId, answer, question }) => {
@@ -917,7 +951,7 @@ function AttentionReviewCard({
         })}
       </div>
       <div className="attention-review__actions">
-        <button onClick={onConfirm} disabled={working}><CheckIcon /> {working ? 'Saving…' : `Save corrections & approve ${answers.length}`}</button>
+        <button onClick={onConfirm} disabled={working}><CheckIcon /> {working ? 'Saving…' : `${isFinal ? 'Save corrections & approve' : 'Save & continue'} ${answers.length}`}</button>
       </div>
       <small className="attention-review__trust"><LockIcon /> No proposal is hidden: every flagged value remains editable before review.</small>
     </section>
