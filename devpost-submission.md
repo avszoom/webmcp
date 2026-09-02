@@ -139,7 +139,7 @@ Suggested outline:
 - **Private judge testing instructions:** use the Testing Instructions section above; no sign-in is required.
 - **Public code repository:** `https://github.com/avszoom/webmcp`
 - **Agents/clients tested:** ChatGPT's in-app browser; Google Chrome 152.0.7977.65 (Official Build, arm64) with WebMCP enabled; and VisaFlow's embedded Voice Application Guide, which discovers registered tools through `document.modelContext.getTools()` and executes them with `document.modelContext.executeTool()`.
-- **AI tools used:** OpenAI Responses API with GPT-5.6 Terra and Codex.
-- **Level of learning:** choose None, Moderate, or Significant.
-- **Career AI value:** choose Yes or No.
+- **AI tools used:** OpenAI Codex was used throughout product design, architecture, React/TypeScript implementation, WebMCP tool and schema development, debugging from conversation logs, automated tests, documentation, GitHub synchronization, and ChatGPT Sites deployment. The production application uses the OpenAI Responses API with GPT-5.6 Terra for server-side natural-language extraction, document understanding, route planning, safe derivations, reviewable proposals, and adaptive follow-up questions. ChatGPT's in-app browser and WebMCP-enabled Chrome were used to test the live semantic-tool experience.
+- **Level of learning:** Significant.
+- **Career AI value:** Yes.
 - **Demo video URL:** `https://youtu.be/edlyolj64XI` — verify public/unlisted playback and duration.
