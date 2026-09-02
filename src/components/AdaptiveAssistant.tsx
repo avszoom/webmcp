@@ -5,6 +5,7 @@ import {
   buildInterviewRequest,
   chooseNovelQuestion,
   mergePartialFacts,
+  type InterviewDocument,
   type InterviewCandidate,
   type InterviewHistoryTurn,
   type InterviewPartialFact,
@@ -15,7 +16,7 @@ import type { PrefillToolCall } from '../webmcp/demoCalls'
 import { useApplication } from '../state/ApplicationContext'
 import { useWebMcp } from '../webmcp/WebMcpContext'
 import type { Locale } from '../i18n'
-import { BotIcon, CheckIcon, LockIcon, RefreshIcon, SpeakerIcon, SpeakerOffIcon, SparkleIcon, WarningIcon, XIcon } from './Icons'
+import { BotIcon, CheckIcon, FileIcon, LockIcon, RefreshIcon, SpeakerIcon, SpeakerOffIcon, SparkleIcon, WarningIcon, XIcon } from './Icons'
 
 type InterviewStage = 'intro' | 'interview' | 'complete'
 
@@ -32,6 +33,7 @@ type StoryChapter = NonNullable<InterviewTurnPlan['next_chapter']>
 interface TurnProgress {
   route: string
   fields: string[]
+  documentFields: string[]
   skippedFields: string[]
   inferredFields: Array<{ label: string; value: string; explanation: string }>
   rememberedFacts: Array<{ label: string; value: string; missingDetail: string }>
@@ -110,6 +112,27 @@ const content = {
 } as const
 
 const questionMap = new Map(questions.map((question) => [question.id, question]))
+const acceptedDocumentTypes = new Set<InterviewDocument['mime_type']>([
+  'application/pdf', 'text/plain', 'image/jpeg', 'image/png', 'image/webp',
+])
+
+function readDocument(file: File): Promise<InterviewDocument> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error(`Could not read ${file.name}.`))
+    reader.onload = () => {
+      const result = String(reader.result ?? '')
+      const comma = result.indexOf(',')
+      resolve({
+        name: file.name,
+        mime_type: file.type as InterviewDocument['mime_type'],
+        size_bytes: file.size,
+        data: comma >= 0 ? result.slice(comma + 1) : result,
+      })
+    }
+    reader.readAsDataURL(file)
+  })
+}
 
 export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRestart: () => void }) {
   const { state, metrics } = useApplication()
@@ -136,11 +159,13 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   const [speaking, setSpeaking] = useState(false)
   const [turnNumber, setTurnNumber] = useState(0)
   const [plannerError, setPlannerError] = useState<string | null>(null)
+  const [attachedDocuments, setAttachedDocuments] = useState<InterviewDocument[]>([])
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const keepListeningRef = useRef(false)
   const committedTranscriptRef = useRef('')
   const conversationRef = useRef<HTMLDivElement | null>(null)
   const transcriptRef = useRef<HTMLTextAreaElement | null>(null)
+  const documentInputRef = useRef<HTMLInputElement | null>(null)
   const stageRef = useRef<InterviewStage>('intro')
   const voiceEnabledRef = useRef(false)
   const startListeningRef = useRef<() => void>(() => {})
@@ -212,7 +237,8 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   }
 
   const processAnswer = async (rawAnswer: string) => {
-    const answer = rawAnswer.trim()
+    const turnDocuments = attachedDocuments
+    const answer = rawAnswer.trim() || (turnDocuments.length ? 'Use the attached documents to complete every supported field you can verify.' : '')
     if (!answer || working || stageRef.current !== 'interview') return
     const answeredQuestion = currentQuestion || lastQuestion
     const answeredChapter = currentChapter
@@ -220,7 +246,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
     setDraft('')
     setCurrentQuestion('')
     setPlannerError(null)
-    addMessage('user', answer)
+    addMessage('user', answer, turnDocuments.length ? `Attached: ${turnDocuments.map((document) => document.name).join(', ')}` : undefined)
     setWorking(true)
     setWorkPhase('understanding')
     setWorkingLabel('Understanding your answer and choosing what matters next')
@@ -235,6 +261,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         answer,
         interviewHistory,
         partialFacts,
+        turnDocuments,
       )
       const response = await fetch('/api/interview', {
         method: 'POST',
@@ -262,7 +289,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         : buildApplicationFlow(purpose, funding, priorVisit)
       const applicableIds = new Set(projectedFlow.applicableQuestionIds)
       const plannedUpdates = plan.updates
-        .filter((update) => update.source === 'user_statement')
+        .filter((update) => update.source === 'user_statement' || update.source === 'document')
         .map((update) => ({
           ...update,
           basis: update.basis ?? 'explicit',
@@ -288,13 +315,29 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         incomingPartialFacts,
         [...updates.map((update) => update.question_id), ...candidates.map((candidate) => candidate.question_id)],
       )
-      if (updates.length) {
+      const statementUpdates = updates.filter((update) => update.source === 'user_statement')
+      const documentUpdates = updates.filter((update) => update.source === 'document')
+      if (statementUpdates.length) {
         calls.push({
           toolName: 'provide_interview_answers',
           label: 'Applying only facts stated in your answer',
           input: {
             source: 'user_statement',
-            answers: updates.map((update) => ({
+            answers: statementUpdates.map((update) => ({
+              question_id: update.question_id,
+              value: update.value,
+              confidence: update.confidence,
+            })),
+          },
+        })
+      }
+      if (documentUpdates.length) {
+        calls.push({
+          toolName: 'provide_interview_answers',
+          label: 'Extracting document facts and flagging them for end review',
+          input: {
+            source: 'document',
+            answers: documentUpdates.map((update) => ({
               question_id: update.question_id,
               value: update.value,
               confidence: update.confidence,
@@ -345,8 +388,9 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       const progress: TurnProgress = {
         route: projectedFlow.labels.join(' → '),
         fields: updates
-          .filter((update) => update.basis === 'explicit')
+          .filter((update) => update.source === 'user_statement' && update.basis === 'explicit')
           .map((update) => questionMap.get(update.question_id)?.label ?? update.question_id),
+        documentFields: documentUpdates.map((update) => questionMap.get(update.question_id)?.label ?? update.question_id),
         skippedFields: skippedUpdates.map((update) => questionMap.get(update.question_id)?.label ?? update.question_id),
         inferredFields: updates
           .filter((update) => update.basis === 'derived')
@@ -392,6 +436,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       setTurnNumber((current) => current + 1)
       setInterviewHistory(nextHistory)
       setPartialFacts(nextPartialFacts)
+      setAttachedDocuments([])
       addMessage('agent', plan.assistant_message, plan.decision_summary, progress)
       setLastQuestion(nextQuestion)
       setCurrentQuestion(nextQuestion)
@@ -420,6 +465,33 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
     }
   }
   processAnswerRef.current = processAnswer
+
+  const attachDocuments = async (files: FileList | null) => {
+    if (!files?.length) return
+    setPlannerError(null)
+    const selected = [...files]
+    if (attachedDocuments.length + selected.length > 3) {
+      setPlannerError('Attach no more than 3 documents at a time.')
+      return
+    }
+    if (selected.some((file) => !acceptedDocumentTypes.has(file.type as InterviewDocument['mime_type']))) {
+      setPlannerError('Use PDF, TXT, JPG, PNG, or WebP documents.')
+      return
+    }
+    const totalBytes = attachedDocuments.reduce((total, document) => total + document.size_bytes, 0)
+      + selected.reduce((total, file) => total + file.size, 0)
+    if (selected.some((file) => file.size > 4 * 1024 * 1024) || totalBytes > 6 * 1024 * 1024) {
+      setPlannerError('Each document must be 4 MB or smaller, with a 6 MB total.')
+      return
+    }
+    try {
+      setAttachedDocuments([...attachedDocuments, ...await Promise.all(selected.map(readDocument))])
+    } catch (error) {
+      setPlannerError(error instanceof Error ? error.message : 'A document could not be read.')
+    } finally {
+      if (documentInputRef.current) documentInputRef.current.value = ''
+    }
+  }
 
   const speakText = (text: string, listenAfter = false, force = false) => {
     const synthesis = window.speechSynthesis
@@ -688,12 +760,34 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
 
       {stage === 'interview' && (
         <div className="assistant-composer">
-          <div>
+          <div className="assistant-document-row">
+            <input
+              ref={documentInputRef}
+              className="assistant-document-input"
+              type="file"
+              accept=".pdf,.txt,.jpg,.jpeg,.png,.webp,application/pdf,text/plain,image/jpeg,image/png,image/webp"
+              multiple
+              aria-label="Choose documents"
+              onChange={(event) => void attachDocuments(event.target.files)}
+            />
+            <button type="button" className="assistant-attach-button" onClick={() => documentInputRef.current?.click()} disabled={working || listening}>
+              <FileIcon /> Attach documents
+            </button>
+            <span>Passport, résumé, itinerary, or invitation · not stored by this website</span>
+          </div>
+          {attachedDocuments.length > 0 && (
+            <div className="assistant-document-chips" aria-label="Attached documents">
+              {attachedDocuments.map((document) => (
+                <span key={`${document.name}-${document.size_bytes}`}><FileIcon />{document.name}<button type="button" aria-label={`Remove ${document.name}`} onClick={() => setAttachedDocuments((current) => current.filter((item) => item !== document))}><XIcon /></button></span>
+              ))}
+            </div>
+          )}
+          <div className="assistant-input-row">
             <button className={`voice-button ${listening ? 'voice-button--listening' : ''}`} onClick={listening ? stopListening : startListening} aria-label={listening ? 'Stop voice recording' : 'Answer by voice'} aria-pressed={listening}>{listening ? '■' : '●'}</button>
             <textarea ref={transcriptRef} value={draft} maxLength={5000} onChange={(event) => setDraft(event.target.value)} placeholder={listening ? copy.listening : copy.placeholder} rows={5} onKeyDown={(event) => {
               if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); if (listening) stopListening(); void processAnswerRef.current(draft) }
             }} />
-            <button className="send-button" disabled={!draft.trim() || working || listening} onClick={() => void processAnswerRef.current(draft)}>{copy.send}</button>
+            <button className="send-button" disabled={(!draft.trim() && !attachedDocuments.length) || working || listening} onClick={() => void processAnswerRef.current(draft)}>{copy.send}</button>
           </div>
           <div className="transcript-meta"><span>{draft.trim() ? `${draft.trim().split(/\s+/).length} words captured` : 'Your live transcript will appear here'}</span><strong>{listening ? 'Listening until you stop' : 'Review before sending'}</strong></div>
           {listening && <div className="voice-listening-hint"><span>■</span>{copy.listeningHint}</div>}
@@ -815,6 +909,7 @@ function TurnProgressCard({ progress }: { progress: TurnProgress }) {
       <div className="turn-progress__route"><CheckIcon /><span><strong>{progress.route}</strong>{progress.removed} irrelevant questions removed</span></div>
       {progress.skippedFields.length > 0 && <div className="turn-progress__skipped"><CheckIcon /><span><strong>{progress.skippedFields.length} details no longer needed</strong>{progress.skippedFields.slice(0, 3).join(' · ')} were excluded after the route changed</span></div>}
       <div className="turn-progress__route"><CheckIcon /><span><strong>{progress.fields.length ? `${progress.fields.length} verified field${progress.fields.length === 1 ? '' : 's'} filled` : 'No unverified fields added'}</strong>{progress.fields.length ? progress.fields.slice(0, 4).join(' · ') : 'Waiting for an explicit answer'}</span></div>
+      {progress.documentFields.length > 0 && <div className="turn-progress__documents"><FileIcon /><span><strong>{`${progress.documentFields.length} document field${progress.documentFields.length === 1 ? '' : 's'} extracted · review at end`}</strong>{progress.documentFields.slice(0, 4).join(' · ')}</span></div>}
       {progress.inferredFields.slice(0, 3).map((field) => <div className="turn-progress__inferred" key={field.label}><SparkleIcon /><span><strong>{field.label}: {field.value}</strong>{field.explanation} · reviewable</span></div>)}
       {progress.candidateFields.length > 0 && <div className="turn-progress__candidates"><SparkleIcon /><span><strong>{`${progress.candidateFields.length} Terra proposal${progress.candidateFields.length === 1 ? '' : 's'} filled · flagged for end review`}</strong>{progress.candidateFields.slice(0, 3).map((field) => `${field.label}: ${field.value}`).join(' · ')}</span></div>}
       {progress.rememberedFacts.length > 0 && <div className="turn-progress__remembered"><SparkleIcon /><span><strong>{`${progress.rememberedFacts.length} incomplete detail${progress.rememberedFacts.length === 1 ? '' : 's'} remembered`}</strong>{progress.rememberedFacts.slice(0, 3).map((fact) => `${fact.label}: ${fact.value} (${fact.missingDetail})`).join(' · ')}</span></div>}

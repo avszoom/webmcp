@@ -704,7 +704,7 @@ export function createVisaApplicationTools(runtime: ToolRuntime): WebMcpToolDefi
           source: {
             type: 'string',
             enum: ['user_statement', 'agent_proposal', 'user_confirmation', 'document'],
-            description: 'Use user_statement for spoken or typed facts, agent_proposal for a reasonable Terra interpretation that is written now and flagged for end review, user_confirmation for end-review approval or correction, and document only for a fictional evidence reference the user explicitly approved.',
+            description: 'Use user_statement for spoken or typed facts, agent_proposal for a reasonable Terra interpretation that is written now and flagged for end review, user_confirmation for end-review approval or correction, and document for facts extracted from a user-attached file.',
           },
           answers: {
             type: 'array',
@@ -777,14 +777,14 @@ export function createVisaApplicationTools(runtime: ToolRuntime): WebMcpToolDefi
             questionId,
             value,
             sourceLabel: source === 'document'
-              ? 'Connected fictional evidence'
+              ? 'Attached document · review at end'
               : source === 'user_confirmation'
                 ? 'User-confirmed Terra proposal'
                 : source === 'agent_proposal'
                   ? 'Terra proposal · review at end'
                   : 'User statement (LLM extracted)',
             confidence,
-            requiresConfirmation: source === 'agent_proposal',
+            requiresConfirmation: source === 'agent_proposal' || source === 'document',
             overwritePending: source === 'user_confirmation',
           })
         }

@@ -214,4 +214,22 @@ describe('WebMCP semantic tool registry', () => {
       verificationStatus: 'confirmed',
     })
   })
+
+  it('fills document facts immediately but keeps every extracted value in final review', async () => {
+    const harness = createHarness(applicationReducer(createInitialState(), { type: 'START', mode: 'personal' }))
+    await harness.execute('select_application_flow', {
+      purpose: 'family_visit', funding: 'self', prior_visit: 'no',
+    })
+    const extracted = await harness.execute('provide_interview_answers', {
+      source: 'document',
+      answers: [{ question_id: 'current_employer', value: 'Northstar Labs', confidence: 0.94 }],
+    }) as { isError?: boolean }
+
+    expect(extracted.isError).not.toBe(true)
+    expect(harness.getState().answers.current_employer).toMatchObject({
+      value: 'Northstar Labs',
+      sourceLabel: 'Attached document · review at end',
+      verificationStatus: 'needs_confirmation',
+    })
+  })
 })

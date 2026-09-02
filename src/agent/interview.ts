@@ -12,10 +12,17 @@ export interface InterviewUpdate {
   question_id: string
   value: string
   confidence: number
-  source: 'user_statement'
+  source: 'user_statement' | 'document'
   basis: 'explicit' | 'derived'
   evidence_text: string
   derivation: string | null
+}
+
+export interface InterviewDocument {
+  name: string
+  mime_type: 'application/pdf' | 'text/plain' | 'image/jpeg' | 'image/png' | 'image/webp'
+  size_bytes: number
+  data: string
 }
 
 export interface InterviewPartialFact {
@@ -93,6 +100,7 @@ export interface InterviewRequest {
     evidence_required: boolean
   }>
   pending_review_question_ids: string[]
+  attached_documents?: InterviewDocument[]
 }
 
 export function buildInterviewRequest(
@@ -104,6 +112,7 @@ export function buildInterviewRequest(
   latestAnswer: string,
   conversationHistory: InterviewHistoryTurn[] = [],
   partialFacts: InterviewPartialFact[] = [],
+  attachedDocuments: InterviewDocument[] = [],
 ): InterviewRequest {
   const applicable = new Set(state.flow?.applicableQuestionIds ?? questions.map((question) => question.id))
   const compactHistory = conversationHistory.slice(-5).map((turn) => ({
@@ -148,6 +157,7 @@ export function buildInterviewRequest(
     pending_review_question_ids: Object.entries(state.answers)
       .filter(([, answer]) => answer.verificationStatus === 'needs_confirmation')
       .map(([questionId]) => questionId),
+    ...(attachedDocuments.length ? { attached_documents: attachedDocuments } : {}),
   }
 }
 

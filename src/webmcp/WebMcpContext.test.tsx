@@ -275,6 +275,47 @@ describe('WebMcpProvider', () => {
     expect(screen.queryByRole('button', { name: 'Review 1 flagged' })).not.toBeInTheDocument()
   })
 
+  it('sends an attached document once and applies extracted facts as reviewable WebMCP writes', async () => {
+    const { definitions, executeTool } = installExecutableModelContext()
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) => new Response(JSON.stringify({
+      plan: {
+        assistant_message: 'I extracted the employment facts from your résumé.',
+        decision_summary: 'One document fact was filled and reserved for final review.',
+        route: { purpose: null, funding: null, prior_visit: null },
+        updates: [{
+          question_id: 'current_employer', value: 'Northstar Labs', confidence: 0.96,
+          source: 'document', basis: 'explicit', evidence_text: 'resume.txt: Northstar Labs', derivation: null,
+        }],
+        candidates: [], partial_facts: [], confirm_question_ids: [],
+        requested_question_ids: ['job_title', 'employment_start'],
+        question_focus_ids: ['job_title', 'employment_start'],
+        next_chapter: 'work_journey', next_question_id: 'profile_employment',
+        next_question: 'Tell me what your role involves and when this chapter began.', is_complete: false,
+      },
+    }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<ApplicationProvider><WebMcpProvider><App /></WebMcpProvider></ApplicationProvider>)
+
+    await waitFor(() => expect(definitions).toHaveLength(22))
+    await screen.findByRole('dialog', { name: 'Application assistant' }, { timeout: 1500 })
+    fireEvent.click(screen.getByRole('button', { name: 'Type instead' }))
+    const file = new File(['Northstar Labs'], 'resume.txt', { type: 'text/plain' })
+    fireEvent.change(screen.getByLabelText('Choose documents'), { target: { files: [file] } })
+    await waitFor(() => expect(screen.getByLabelText('Attached documents')).toHaveTextContent('resume.txt'))
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Review 1 flagged' })).toBeInTheDocument())
+    const request = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body)) as { attached_documents: Array<{ name: string; data: string }> }
+    expect(request.attached_documents[0]).toMatchObject({ name: 'resume.txt' })
+    expect(request.attached_documents[0].data).toBeTruthy()
+    const documentCall = executeTool.mock.calls
+      .filter(([tool]) => tool.name === 'provide_interview_answers')
+      .map(([, input]) => JSON.parse(input) as { source: string })
+      .find((input) => input.source === 'document')
+    expect(documentCall).toBeTruthy()
+    expect(screen.queryByLabelText('Attached documents')).not.toBeInTheDocument()
+  })
+
   it('keeps voice capture open through final speech until the user presses stop', async () => {
     const { definitions } = installExecutableModelContext()
     const fetchMock = vi.fn()
