@@ -88,7 +88,9 @@ https://github.com/avszoom/webmcp
 
 ## Demo Video
 
-TODO: Add the public YouTube URL. The official requirement is a clear video with audio under three minutes showing the product and how WebMCP is used.
+https://youtu.be/edlyolj64XI
+
+Before final submission, verify that the video is public or unlisted, plays without sign-in, contains audio, and is under three minutes.
 
 Suggested outline:
 
@@ -140,4 +142,4 @@ Suggested outline:
 - **AI tools used:** OpenAI Responses API with GPT-5.6 Terra and Codex.
 - **Level of learning:** choose None, Moderate, or Significant.
 - **Career AI value:** choose Yes or No.
-- **Demo video URL:** add the public YouTube link.
+- **Demo video URL:** `https://youtu.be/edlyolj64XI` — verify public/unlisted playback and duration.
