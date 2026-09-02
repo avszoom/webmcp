@@ -17,7 +17,7 @@ import type { PrefillToolCall } from '../webmcp/demoCalls'
 import { useApplication } from '../state/ApplicationContext'
 import { useWebMcp } from '../webmcp/WebMcpContext'
 import type { Locale } from '../i18n'
-import { BotIcon, CheckIcon, FileIcon, LockIcon, RefreshIcon, SpeakerIcon, SpeakerOffIcon, SparkleIcon, WarningIcon, XIcon } from './Icons'
+import { BotIcon, CheckIcon, ChevronRightIcon, FileIcon, LockIcon, RefreshIcon, SpeakerIcon, SpeakerOffIcon, SparkleIcon, WarningIcon, XIcon } from './Icons'
 
 type InterviewStage = 'intro' | 'interview' | 'complete'
 
@@ -82,7 +82,7 @@ const initialFastIntakeIds = [
 const content = {
   en: {
     greeting: 'This application is deliberately long, but we can finish the applicable path together. I’ll fill stated and reasonably derived values now, flag uncertainty for one final review, and show every WebMCP action.',
-    privacy: 'Your answer is sent to OpenAI for planning. The API key stays server-side, every value is validated by this website, and nothing is submitted.',
+    privacy: 'Your answer is sent to OpenAI for planning. The API key stays server-side, and every value is validated by this website.',
     startVoice: 'Start with voice', type: 'Type instead', later: 'Not now',
     trip: 'Imagine you’re telling a friend about this trip. Take me from home to the United States—what is the plan, and what makes you want to go?',
     placeholder: 'Speak or type naturally…', send: 'Send', listening: 'Listening through pauses…',
@@ -91,21 +91,21 @@ const content = {
   },
   es: {
     greeting: 'Esta solicitud es deliberadamente larga, pero podemos completar juntos la ruta aplicable. Cuénteme su viaje con sus propias palabras; decidiré qué preguntar después y explicaré cada acción WebMCP.',
-    privacy: 'Su respuesta se envía a OpenAI para planificar. La clave permanece en el servidor, este sitio valida cada valor y no se envía ninguna solicitud.',
+    privacy: 'Su respuesta se envía a OpenAI para planificar. La clave permanece en el servidor y este sitio valida cada valor.',
     startVoice: 'Comenzar por voz', type: 'Escribir', later: 'Ahora no',
     trip: 'Imagine que le cuenta este viaje a un amigo. Lléveme desde su casa hasta Estados Unidos: ¿cuál es el plan y por qué quiere ir?',
     placeholder: 'Hable o escriba naturalmente…', send: 'Enviar', listening: 'Escuchando durante las pausas…', listeningHint: 'Tómese su tiempo. Pulse el cuadrado rojo al terminar; luego revise y envíe.', activity: 'Decisiones y acciones WebMCP', routePending: 'Ruta sin seleccionar', restart: 'Empezar de nuevo',
   },
   fr: {
     greeting: 'Cette demande est volontairement longue, mais nous pouvons terminer ensemble le parcours applicable. Décrivez votre voyage librement ; je choisirai la prochaine question et expliquerai chaque action WebMCP.',
-    privacy: 'Votre réponse est envoyée à OpenAI pour la planification. La clé reste côté serveur, ce site valide chaque valeur et rien n’est soumis.',
+    privacy: 'Votre réponse est envoyée à OpenAI pour la planification. La clé reste côté serveur et ce site valide chaque valeur.',
     startVoice: 'Commencer par la voix', type: 'Écrire', later: 'Plus tard',
     trip: 'Imaginez que vous racontez ce voyage à un ami. Emmenez-moi de chez vous aux États-Unis : quel est le projet et pourquoi partir ?',
     placeholder: 'Parlez ou écrivez naturellement…', send: 'Envoyer', listening: 'Écoute maintenue pendant les pauses…', listeningHint: 'Prenez votre temps. Cliquez sur le carré rouge lorsque vous avez terminé, puis relisez et envoyez.', activity: 'Décisions et actions WebMCP', routePending: 'Parcours non sélectionné', restart: 'Recommencer',
   },
   hi: {
     greeting: 'यह आवेदन जानबूझकर लंबा है, लेकिन हम सही रास्ता साथ मिलकर पूरा कर सकते हैं। अपनी यात्रा सामान्य भाषा में बताइए; मैं अगला उपयोगी सवाल चुनूँगा और हर WebMCP कार्रवाई समझाऊँगा।',
-    privacy: 'योजना बनाने के लिए आपका उत्तर OpenAI को भेजा जाता है। API कुंजी सर्वर पर रहती है, वेबसाइट हर मान जाँचती है और कुछ भी जमा नहीं होता।',
+    privacy: 'योजना बनाने के लिए आपका उत्तर OpenAI को भेजा जाता है। API कुंजी सर्वर पर रहती है और वेबसाइट हर मान की जाँच करती है।',
     startVoice: 'आवाज़ से शुरू करें', type: 'टाइप करें', later: 'अभी नहीं',
     trip: 'मान लीजिए आप किसी दोस्त को यह यात्रा सुना रहे हैं। घर से अमेरिका तक की योजना क्या है, और आप क्यों जाना चाहते हैं?',
     placeholder: 'स्वाभाविक रूप से बोलें या लिखें…', send: 'भेजें', listening: 'रुकने पर भी सुन रहा हूँ…', listeningHint: 'आराम से बोलें। पूरा होने पर लाल चौकोर दबाएँ, फिर जाँचकर भेजें।', activity: 'एजेंट निर्णय और WebMCP कार्रवाई', routePending: 'रास्ता चुना नहीं गया', restart: 'फिर से शुरू करें',
@@ -113,14 +113,6 @@ const content = {
 } as const
 
 const questionMap = new Map(questions.map((question) => [question.id, question]))
-const demoDocuments = [
-  { name: 'demo-passport-aarav-mehta.pdf', label: 'Passport' },
-  { name: 'demo-degree-certificate-aarav-mehta.pdf', label: 'Degree' },
-  { name: 'demo-utility-bill-aarav-mehta.pdf', label: 'Utility bill' },
-  { name: 'demo-issued-flight-ticket-aarav-mehta.pdf', label: 'Flight ticket' },
-  { name: 'demo-employment-letter-aarav-mehta.pdf', label: 'Employment letter' },
-  { name: 'demo-brother-invitation-letter-aarav-mehta.pdf', label: "Brother's invitation" },
-] as const
 const acceptedDocumentTypes = new Set<InterviewDocument['mime_type']>([
   'application/pdf', 'text/plain', 'image/jpeg', 'image/png', 'image/webp',
 ])
@@ -143,7 +135,17 @@ function readDocument(file: File): Promise<InterviewDocument> {
   })
 }
 
-export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRestart: () => void }) {
+export function AdaptiveAssistant({
+  locale,
+  onRestart,
+  onSubmit,
+  submitted,
+}: {
+  locale: Locale
+  onRestart: () => void
+  onSubmit: () => void
+  submitted: boolean
+}) {
   const { state, metrics } = useApplication()
   const webMcp = useWebMcp()
   const copy = content[locale]
@@ -151,6 +153,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   const [stage, setStage] = useState<InterviewStage>('intro')
   const [draft, setDraft] = useState('')
   const [working, setWorking] = useState(false)
+  const [workingPercent, setWorkingPercent] = useState(0)
   const [workPhase, setWorkPhase] = useState<WorkPhase>('understanding')
   const [workingLabel, setWorkingLabel] = useState('Understanding your answer')
   const [listening, setListening] = useState(false)
@@ -169,7 +172,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   const [turnNumber, setTurnNumber] = useState(0)
   const [plannerError, setPlannerError] = useState<string | null>(null)
   const [attachedDocuments, setAttachedDocuments] = useState<InterviewDocument[]>([])
-  const [loadingDemoDocuments, setLoadingDemoDocuments] = useState(false)
+  const [historyExpanded, setHistoryExpanded] = useState(false)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const keepListeningRef = useRef(false)
   const committedTranscriptRef = useRef('')
@@ -200,15 +203,42 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   }, [messages, working])
 
   useEffect(() => {
+    if (!working) {
+      setWorkingPercent(0)
+      return
+    }
+    const floor = workPhase === 'understanding' ? 8 : 68
+    const ceiling = workPhase === 'understanding' ? 64 : 96
+    setWorkingPercent((current) => Math.max(current, floor))
+    const timer = window.setInterval(() => {
+      setWorkingPercent((current) => {
+        if (current >= ceiling) return current
+        return Math.min(ceiling, current + Math.max(1, Math.ceil((ceiling - current) * 0.09)))
+      })
+    }, 280)
+    return () => window.clearInterval(timer)
+  }, [workPhase, working])
+
+  useEffect(() => {
+    if (!working || webMcp.prefillStatus !== 'running' || !webMcp.prefillProgress.total) return
+    const semanticProgress = 68 + Math.round((webMcp.prefillProgress.completed / webMcp.prefillProgress.total) * 28)
+    setWorkingPercent((current) => Math.max(current, semanticProgress))
+  }, [webMcp.prefillProgress.completed, webMcp.prefillProgress.total, webMcp.prefillStatus, working])
+
+  useEffect(() => {
     const transcript = transcriptRef.current
     if (!transcript) return
     transcript.style.height = 'auto'
-    transcript.style.height = `${Math.min(Math.max(transcript.scrollHeight, 132), 260)}px`
+    transcript.style.height = `${Math.min(Math.max(transcript.scrollHeight, 82), 140)}px`
     transcript.scrollTop = transcript.scrollHeight
   }, [draft, listening])
 
   const route = state.flow
   const routePreview = useMemo(() => route ?? buildApplicationFlow('undetermined'), [route])
+  const canSubmit = metrics.missing === 0
+    && metrics.needsConfirmation === 0
+    && metrics.conflicts === 0
+    && state.reviewStatus === 'ready'
   const attentionAnswers = useMemo(() => {
     const applicable = new Set(routePreview.applicableQuestionIds)
     return Object.entries(state.answers)
@@ -479,6 +509,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         stageRef.current = 'complete'
         setStage('complete')
       }
+      setWorkingPercent(100)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'The adaptive planner is temporarily unavailable.'
       setPlannerError(message)
@@ -514,25 +545,6 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       setPlannerError(error instanceof Error ? error.message : 'A document could not be read.')
     } finally {
       if (documentInputRef.current) documentInputRef.current.value = ''
-    }
-  }
-
-  const loadDemoDocumentPack = async () => {
-    if (working || listening || loadingDemoDocuments) return
-    setPlannerError(null)
-    setLoadingDemoDocuments(true)
-    try {
-      const documents = await Promise.all(demoDocuments.map(async ({ name }) => {
-        const response = await fetch(`/demo-documents/${name}`)
-        if (!response.ok) throw new Error('The demo document pack is temporarily unavailable.')
-        const blob = await response.blob()
-        return readDocument(new File([blob], name, { type: 'application/pdf' }))
-      }))
-      setAttachedDocuments(documents)
-    } catch (error) {
-      setPlannerError(error instanceof Error ? error.message : 'The demo document pack could not be loaded.')
-    } finally {
-      setLoadingDemoDocuments(false)
     }
   }
 
@@ -595,6 +607,11 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
     speakText(currentQuestion, false, true)
   }
 
+  const focusComposer = () => {
+    setHistoryExpanded(false)
+    window.setTimeout(() => transcriptRef.current?.focus(), 80)
+  }
+
   const confirmAttentionQueue = async () => {
     if (!attentionAnswers.length || working) return
     setWorking(true)
@@ -640,6 +657,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         setStage('complete')
         setCurrentQuestion('')
       }
+      setWorkingPercent(100)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'The review could not be saved.'
       setPlannerError(message)
@@ -737,12 +755,15 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
 
   return (
     <aside className="adaptive-assistant" role="dialog" aria-label="Application assistant">
-      <div className="assistant-glass-panel">
+      <div className={`assistant-glass-panel ${historyExpanded ? 'assistant-glass-panel--history' : ''}`}>
       <header className="assistant-header">
         <span className="assistant-avatar assistant-orb"><BotIcon /></span>
         <div><strong>Voice Application Guide</strong><span><i /> {speaking ? 'Speaking now' : listening ? 'Listening until you stop' : 'Reasoning and filling with WebMCP'}</span></div>
         <button className="assistant-voice-toggle" onClick={toggleVoice} aria-label={voiceEnabled ? 'Mute agent voice' : 'Enable agent voice'} aria-pressed={voiceEnabled} title={voiceEnabled ? 'Mute agent voice' : 'Enable agent voice'}>
           {voiceEnabled ? <SpeakerIcon /> : <SpeakerOffIcon />}
+        </button>
+        <button className="assistant-history-toggle" onClick={() => setHistoryExpanded((value) => !value)} aria-pressed={historyExpanded}>
+          {historyExpanded ? 'Back' : 'History'}
         </button>
         <button onClick={closeAssistant} aria-label="Close assistant"><XIcon /></button>
       </header>
@@ -768,7 +789,11 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         ))}
         {working && (
           <div className="assistant-working">
-            <div className="assistant-working__status"><SparkleIcon /><div><strong>{webMcp.prefillStatus === 'running' ? webMcp.prefillProgress.label : workingLabel}</strong><span>{webMcp.prefillStatus === 'running' ? `${webMcp.prefillProgress.completed} of ${webMcp.prefillProgress.total} semantic actions` : 'The model plans; the website validates and writes'}</span></div></div>
+            <div className="assistant-working__status">
+              <div className="assistant-working__percent" style={{ background: `conic-gradient(#75f0ad ${workingPercent}%, rgba(255,255,255,.14) 0)` }}><span>{workingPercent}%</span></div>
+              <div><strong>{webMcp.prefillStatus === 'running' ? webMcp.prefillProgress.label : workingLabel}</strong><span>{webMcp.prefillStatus === 'running' ? `${webMcp.prefillProgress.completed} of ${webMcp.prefillProgress.total} semantic actions` : 'Reading context, extracting facts, and choosing the next useful gap'}</span></div>
+            </div>
+            <div className="assistant-working__bar"><span style={{ width: `${workingPercent}%` }} /></div>
             <div className="assistant-work-steps">
               <span className={workPhase === 'understanding' ? 'is-active' : 'is-done'}><i>1</i> Understand</span>
               <span className={workPhase === 'executing' ? 'is-active' : ''}><i>2</i> Validate</span>
@@ -790,7 +815,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         {stage === 'complete' && (
           <div className="assistant-result">
             <CheckIcon />
-            <div><strong>{metrics.completed} of {metrics.total} applicable questions completed</strong><span>{metrics.needsConfirmation} flagged reviews · {metrics.evidenceNeeded} evidence items · {metrics.conflicts} conflicts remain</span></div>
+            <div><strong>{metrics.completed} of {metrics.total} applicable questions completed</strong><span>{submitted ? 'Application submitted successfully' : 'All checks passed. Finish and submit when you are ready.'}</span></div>
           </div>
         )}
       </div>
@@ -810,8 +835,37 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
         />
       )}
 
+      {!working && !attentionReviewOpen && attentionAnswers.length > 0 && metrics.missing === 0 && (
+        <NextActionCard
+          title={`Review ${attentionAnswers.length} filled values`}
+          detail="Confirm or correct the highlighted interpretations once, then submit."
+          action="Review now"
+          onAction={() => setAttentionReviewOpen(true)}
+        />
+      )}
+
+      {!working && !attentionAnswers.length && canSubmit && !submitted && (
+        <NextActionCard
+          title="Your application is ready"
+          detail="Every applicable answer is complete and reviewed."
+          action="Finish & submit"
+          onAction={onSubmit}
+          complete
+        />
+      )}
+
+      {!working && submitted && (
+        <NextActionCard
+          title="Application submitted"
+          detail="Your completion receipt is shown in the application."
+          action="Submitted"
+          complete
+          disabled
+        />
+      )}
+
       {stage === 'interview' && !working && currentQuestion && (
-        <CurrentQuestionCard locale={locale} question={currentQuestion} chapter={currentChapter} focusCount={currentQuestionIds.length} speaking={speaking} onReplay={replayCurrentQuestion} />
+        <CurrentQuestionCard locale={locale} question={currentQuestion} chapter={currentChapter} focusCount={currentQuestionIds.length} speaking={speaking} onReplay={replayCurrentQuestion} onAnswer={focusComposer} />
       )}
 
       {stage === 'interview' && (
@@ -829,15 +883,8 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
             <button type="button" className="assistant-attach-button" onClick={() => documentInputRef.current?.click()} disabled={working || listening}>
               <FileIcon /> Attach documents
             </button>
-            <button type="button" className="assistant-demo-pack-button" onClick={() => void loadDemoDocumentPack()} disabled={working || listening || loadingDemoDocuments}>
-              <SparkleIcon /> {loadingDemoDocuments ? 'Loading samples…' : 'Load demo pack'}
-            </button>
             <span>Files are not stored by this website</span>
           </div>
-          <details className="assistant-sample-links">
-            <summary>View or download the 6 fictional sample documents</summary>
-            <div>{demoDocuments.map(({ name, label }) => <a key={name} href={`/demo-documents/${name}`} target="_blank" rel="noreferrer" download>{label}</a>)}</div>
-          </details>
           {attachedDocuments.length > 0 && (
             <div className="assistant-document-chips" aria-label="Attached documents">
               {attachedDocuments.map((document) => (
@@ -888,6 +935,29 @@ function NextQuestionLoading() {
     <section className="assistant-next-question assistant-next-question--loading" aria-live="polite" aria-label="Finding the next question">
       <div className="assistant-next-question__label"><SparkleIcon /><span>BUILDING ON YOUR ANSWER</span></div>
       <p>Finding the smallest useful gap—without asking you to repeat yourself…</p>
+    </section>
+  )
+}
+
+function NextActionCard({
+  title,
+  detail,
+  action,
+  onAction,
+  complete = false,
+  disabled = false,
+}: {
+  title: string
+  detail: string
+  action: string
+  onAction?: () => void
+  complete?: boolean
+  disabled?: boolean
+}) {
+  return (
+    <section className={`assistant-next-action ${complete ? 'assistant-next-action--complete' : ''}`} aria-label="Next action">
+      <div><span>NEXT ACTION</span><strong>{title}</strong><small>{detail}</small></div>
+      <button type="button" onClick={onAction} disabled={disabled}>{complete ? <CheckIcon /> : <ChevronRightIcon />}{action}</button>
     </section>
   )
 }
@@ -958,13 +1028,13 @@ function AttentionReviewCard({
   )
 }
 
-function CurrentQuestionCard({ locale, question, chapter, focusCount, speaking, onReplay }: { locale: Locale; question: string; chapter: StoryChapter; focusCount: number; speaking: boolean; onReplay: () => void }) {
+function CurrentQuestionCard({ locale, question, chapter, focusCount, speaking, onReplay, onAnswer }: { locale: Locale; question: string; chapter: StoryChapter; focusCount: number; speaking: boolean; onReplay: () => void; onAnswer: () => void }) {
   const visibleFocusCount = Math.max(1, Math.min(focusCount, 5))
   return (
     <section className="assistant-next-question" aria-live="polite" aria-label="Current question">
-      <div className="assistant-next-question__label"><SparkleIcon /><span>{storyChapterLabels[locale][chapter]}</span><button onClick={onReplay} aria-label="Replay current question"><SpeakerIcon /> {speaking ? 'SPEAKING' : 'REPLAY'}</button><em>ANSWER THIS NEXT</em></div>
+      <div className="assistant-next-question__label"><SparkleIcon /><span>YOUR NEXT ACTION · {storyChapterLabels[locale][chapter]}</span><button onClick={onReplay} aria-label="Replay current question"><SpeakerIcon /> {speaking ? 'SPEAKING' : 'REPLAY'}</button></div>
       <p>{question}</p>
-      <div className="assistant-next-question__scope"><strong>ONE ANSWER · {visibleFocusCount} RELATED DETAIL{visibleFocusCount === 1 ? '' : 'S'}</strong><span>Tell it naturally—I’ll connect everything and ask only about real gaps.</span></div>
+      <div className="assistant-next-question__scope"><strong>ONE ANSWER · {visibleFocusCount} RELATED DETAIL{visibleFocusCount === 1 ? '' : 'S'}</strong><span>Tell it naturally—I’ll connect everything and ask only about real gaps.</span><button type="button" onClick={onAnswer}>Answer below</button></div>
     </section>
   )
 }

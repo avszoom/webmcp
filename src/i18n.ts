@@ -5,7 +5,7 @@ export type Locale = 'en' | 'es' | 'fr' | 'hi'
 const strings = {
   en: {
     language: 'Language', help: 'Help', application: 'Online Nonimmigrant Visa Application',
-    subtitle: 'Tourist and visitor visa · Form DS-160 style demonstration', saved: 'Draft saved',
+    subtitle: 'Tourist and visitor visa · Form DS-160 style application', saved: 'Draft saved',
     reset: 'Start over', original: 'Original application', questions: 'questions', completed: 'Filled',
     missing: 'Unanswered', confirm: 'Awaiting review', evidence: 'Evidence', section: 'Section', answered: 'answered',
     includedFilled: 'included in filled', includedUnanswered: 'included in unanswered',
@@ -13,7 +13,7 @@ const strings = {
   },
   es: {
     language: 'Idioma', help: 'Ayuda', application: 'Solicitud de visa de no inmigrante en línea',
-    subtitle: 'Visa de turista y visitante · Demostración estilo formulario DS-160', saved: 'Borrador guardado',
+    subtitle: 'Visa de turista y visitante · Solicitud estilo formulario DS-160', saved: 'Borrador guardado',
     reset: 'Empezar de nuevo', original: 'Solicitud original', questions: 'preguntas', completed: 'Con datos',
     missing: 'Sin responder', confirm: 'Pendientes de revisión', evidence: 'Pruebas', section: 'Sección', answered: 'respondidas',
     includedFilled: 'incluidas en completadas', includedUnanswered: 'incluidas en sin responder',
@@ -21,7 +21,7 @@ const strings = {
   },
   fr: {
     language: 'Langue', help: 'Aide', application: 'Demande de visa non-immigrant en ligne',
-    subtitle: 'Visa de tourisme et de visite · Démonstration de type DS-160', saved: 'Brouillon enregistré',
+    subtitle: 'Visa de tourisme et de visite · Demande de type DS-160', saved: 'Brouillon enregistré',
     reset: 'Recommencer', original: 'Demande initiale', questions: 'questions', completed: 'Renseignées',
     missing: 'Sans réponse', confirm: 'À vérifier', evidence: 'Justificatifs', section: 'Section', answered: 'répondues',
     includedFilled: 'incluses dans renseignées', includedUnanswered: 'incluses dans sans réponse',
@@ -29,7 +29,7 @@ const strings = {
   },
   hi: {
     language: 'भाषा', help: 'सहायता', application: 'ऑनलाइन गैर-आप्रवासी वीज़ा आवेदन',
-    subtitle: 'पर्यटक और आगंतुक वीज़ा · DS-160 शैली प्रदर्शन', saved: 'ड्राफ्ट सहेजा गया',
+    subtitle: 'पर्यटक और आगंतुक वीज़ा · DS-160 शैली आवेदन', saved: 'ड्राफ्ट सहेजा गया',
     reset: 'फिर से शुरू करें', original: 'मूल आवेदन', questions: 'प्रश्न', completed: 'भरे गए',
     missing: 'अनुत्तरित', confirm: 'समीक्षा बाकी', evidence: 'प्रमाण', section: 'अनुभाग', answered: 'उत्तर',
     includedFilled: 'भरे गए में शामिल', includedUnanswered: 'अनुत्तरित में शामिल',

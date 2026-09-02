@@ -10,7 +10,7 @@ export function GovernmentHeader({ language, onLanguageChange }: GovernmentHeade
     <>
       <div className="demo-warning">
         <span className="mini-flag" aria-hidden="true">★</span>
-        <strong>Official-style demonstration</strong>
+        <strong>Independent application prototype</strong>
         <span>This is not a U.S. government website and does not submit a real visa application.</span>
       </div>
       <header className="government-header">
@@ -31,7 +31,7 @@ export function GovernmentHeader({ language, onLanguageChange }: GovernmentHeade
           </div>
         </div>
       </header>
-      <div className="government-subnav"><span>B-2 Visitor Visa</span><span>Application ID: AA00-DEMO</span></div>
+      <div className="government-subnav"><span>B-2 Visitor Visa</span><span>Application ID: AA00-7K4P</span></div>
     </>
   )
 }

@@ -1,7 +1,9 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../App'
+import { questions } from '../data/questions'
 import { ApplicationProvider } from '../state/ApplicationContext'
+import { createInitialState, STORAGE_KEY } from '../state/applicationState'
 import { WebMcpProvider, useWebMcp } from './WebMcpContext'
 import type { WebMcpToolDefinition } from './types'
 
@@ -188,6 +190,7 @@ describe('WebMcpProvider', () => {
 
     expect(screen.queryByRole('region', { name: 'Current question' })).not.toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Finding the next question' })).toHaveTextContent('without asking you to repeat yourself')
+    await waitFor(() => expect(screen.getByText(/Reading context, extracting facts/).parentElement?.parentElement).toHaveTextContent(/\d+%/))
 
     releasePlan?.(new Response(JSON.stringify({
       plan: {
@@ -211,6 +214,56 @@ describe('WebMcpProvider', () => {
 
     await waitFor(() => expect(screen.getByRole('region', { name: 'Current question' })).toHaveTextContent('what you do today'))
     expect(screen.queryByRole('region', { name: 'Finding the next question' })).not.toBeInTheDocument()
+  })
+
+  it('shows one clear next action, a full-height history mode, and a visible submission control', async () => {
+    const { definitions } = installExecutableModelContext()
+    render(<ApplicationProvider><WebMcpProvider><App /></WebMcpProvider></ApplicationProvider>)
+
+    await waitFor(() => expect(definitions).toHaveLength(22))
+    const assistant = await screen.findByRole('dialog', { name: 'Application assistant' }, { timeout: 1500 })
+    fireEvent.click(screen.getByRole('button', { name: 'Type instead' }))
+
+    const currentQuestion = screen.getByRole('region', { name: 'Current question' })
+    expect(currentQuestion).toHaveTextContent('YOUR NEXT ACTION')
+    expect(screen.getByRole('button', { name: 'Answer below' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Load demo pack/ })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'History' }))
+    expect(screen.getByRole('button', { name: 'Back' })).toBeInTheDocument()
+    expect(assistant.querySelector('.assistant-glass-panel--history')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Back' }))
+    expect(assistant.querySelector('.assistant-glass-panel--history')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /10Review/ }))
+    expect(screen.getByRole('button', { name: 'Finish & submit' })).toBeDisabled()
+    expect(screen.getByText(/Complete 55 unanswered fields before submitting/)).toBeInTheDocument()
+  })
+
+  it('finishes a reviewed application and shows a submission receipt', async () => {
+    const readyState = createInitialState()
+    readyState.activeSectionId = 'review'
+    readyState.reviewStatus = 'ready'
+    readyState.answers = Object.fromEntries(questions.map((question) => [question.id, {
+      value: question.type === 'yes-no' ? 'Yes' : question.options?.[0] ?? 'Completed',
+      source: 'human' as const,
+      sourceLabel: 'Entered by you',
+      confidence: 1,
+      verificationStatus: 'confirmed' as const,
+      sensitivity: question.sensitivity,
+      lastUpdated: '2026-09-01T12:00:00.000Z',
+    }]))
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(readyState))
+
+    const { definitions } = installExecutableModelContext()
+    render(<ApplicationProvider><WebMcpProvider><App /></WebMcpProvider></ApplicationProvider>)
+    await waitFor(() => expect(definitions).toHaveLength(22))
+
+    const submit = screen.getByRole('button', { name: 'Finish & submit' })
+    expect(submit).toBeEnabled()
+    fireEvent.click(submit)
+    expect(screen.getByRole('region', { name: 'Submission receipt' })).toHaveTextContent('Application submitted successfully')
+    expect(screen.getByRole('button', { name: 'Application submitted' })).toBeDisabled()
   })
 
   it('fills Terra proposals immediately and collects them in one non-blocking review queue', async () => {

@@ -53,7 +53,7 @@ export const sections: ApplicationSection[] = [
     id: 'documents',
     title: 'Supporting documents',
     shortTitle: 'Documents',
-    description: 'Evidence that supports this fictional application.',
+    description: 'Evidence that supports this application.',
   },
   {
     id: 'review',
@@ -90,7 +90,7 @@ export const questions: ApplicationQuestion[] = [
   q({ id: 'phone', sectionId: 'contact', label: 'Primary phone number', type: 'text', placeholder: '+1 555 000 0000' }),
   q({ id: 'alternate_phone', sectionId: 'contact', label: 'Alternate phone number', type: 'text', required: false }),
   q({ id: 'preferred_contact', sectionId: 'contact', label: 'Preferred contact method', type: 'select', options: ['Email', 'Phone', 'Either'] }),
-  q({ id: 'social_handle', sectionId: 'contact', label: 'Public social profile', helper: 'Optional for this fictional prototype.', type: 'text', required: false }),
+  q({ id: 'social_handle', sectionId: 'contact', label: 'Public social profile', helper: 'Optional.', type: 'text', required: false }),
 
   q({ id: 'current_street', sectionId: 'addresses', label: 'Current street address', type: 'text', placeholder: 'Street and unit' }),
   q({ id: 'current_city', sectionId: 'addresses', label: 'Current city', type: 'text' }),
@@ -136,7 +136,7 @@ export const questions: ApplicationQuestion[] = [
   q({ id: 'review_dates', sectionId: 'review', label: 'Travel dates are accurate', type: 'yes-no' }),
   q({ id: 'review_history', sectionId: 'review', label: 'Address and employment history is complete', type: 'yes-no' }),
   q({ id: 'review_sensitive', sectionId: 'review', label: 'Sensitive information has been confirmed', type: 'yes-no' }),
-  q({ id: 'review_declaration', sectionId: 'review', label: 'I confirm this fictional application is ready for human review', type: 'yes-no', sensitivity: 'sensitive' }),
+  q({ id: 'review_declaration', sectionId: 'review', label: 'I confirm this application is accurate and ready to submit', type: 'yes-no', sensitivity: 'sensitive' }),
 ]
 
 export const questionsBySection = Object.fromEntries(

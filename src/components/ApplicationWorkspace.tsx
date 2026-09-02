@@ -12,6 +12,7 @@ export function ApplicationWorkspace() {
   const { state, dispatch, metrics } = useApplication()
   const [language, setLanguage] = useState<Locale>('en')
   const [assistantSession, setAssistantSession] = useState(0)
+  const [submissionReceipt, setSubmissionReceipt] = useState<{ id: string; submittedAt: string } | null>(null)
   const applicableIds = useMemo(
     () => new Set(state.flow?.applicableQuestionIds ?? questions.map((question) => question.id)),
     [state.flow],
@@ -23,6 +24,14 @@ export function ApplicationWorkspace() {
   const activeSection = visibleSections.find((section) => section.id === state.activeSectionId) ?? visibleSections[0]
   const activeIndex = visibleSections.findIndex((section) => section.id === activeSection.id)
   const activeQuestions = questionsBySection[activeSection.id].filter((question) => applicableIds.has(question.id))
+  const canSubmit = metrics.missing === 0 && metrics.needsConfirmation === 0 && metrics.conflicts === 0
+  const submissionGuidance = metrics.missing > 0
+    ? `Complete ${metrics.missing} unanswered field${metrics.missing === 1 ? '' : 's'} before submitting.`
+    : metrics.needsConfirmation > 0
+      ? `Review ${metrics.needsConfirmation} filled value${metrics.needsConfirmation === 1 ? '' : 's'} with the guide before submitting.`
+      : metrics.conflicts > 0
+        ? `Resolve ${metrics.conflicts} conflicting value${metrics.conflicts === 1 ? '' : 's'} before submitting.`
+        : 'Every applicable field is complete and reviewed.'
 
   useEffect(() => {
     if (activeSection.id !== state.activeSectionId) dispatch({ type: 'SET_SECTION', sectionId: activeSection.id })
@@ -42,7 +51,16 @@ export function ApplicationWorkspace() {
     if (!confirmed) return
 
     dispatch({ type: 'RESET_APPLICATION' })
+    setSubmissionReceipt(null)
     setAssistantSession((current) => current + 1)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const submitApplication = () => {
+    if (!canSubmit || submissionReceipt) return
+    const submittedAt = new Date()
+    const id = `AVV-${submittedAt.getUTCFullYear()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+    setSubmissionReceipt({ id, submittedAt: submittedAt.toISOString() })
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
@@ -70,10 +88,17 @@ export function ApplicationWorkspace() {
 
           <div className="workspace-content">
             <div className="application-intro">
-              <span>U.S. VISITOR VISA · DEMONSTRATION</span>
+              <span>U.S. VISITOR VISA · ONLINE APPLICATION</span>
               <h1>Tourist and temporary visitor application</h1>
               <p>Complete all questions that apply to you. Your answers determine which additional sections and supporting evidence are required.</p>
             </div>
+
+            {submissionReceipt && (
+              <section className="submission-receipt" aria-label="Submission receipt">
+                <span><CheckIcon /></span>
+                <div><strong>Application submitted successfully</strong><p>Your completed application has been accepted for review.</p><small>Confirmation {submissionReceipt.id} · {new Date(submissionReceipt.submittedAt).toLocaleString()}</small></div>
+              </section>
+            )}
 
             <section className={`flow-summary ${state.flow ? 'flow-summary--selected' : ''}`} aria-label="Application path">
               <div className="flow-summary__icon">{state.flow ? <CheckIcon /> : <span>55</span>}</div>
@@ -123,14 +148,22 @@ export function ApplicationWorkspace() {
                 {activeIndex < visibleSections.length - 1 && (
                   <button className="primary-button" onClick={goNext}>{t(language, 'saveContinue')} <ChevronRightIcon /></button>
                 )}
+                {activeIndex === visibleSections.length - 1 && (
+                  <div className="submission-actions">
+                    <small>{submissionReceipt ? `Submitted · ${submissionReceipt.id}` : submissionGuidance}</small>
+                    <button className="submit-application-button" onClick={submitApplication} disabled={!canSubmit || Boolean(submissionReceipt)}>
+                      <CheckIcon /> {submissionReceipt ? 'Application submitted' : 'Finish & submit'}
+                    </button>
+                  </div>
+                )}
               </div>
             </section>
 
-            <div className="privacy-footer"><LockIcon /><p><strong>Privacy and security</strong><span>This demonstration stores data only in your browser. It does not transmit or submit a government form.</span></p></div>
+            <div className="privacy-footer"><LockIcon /><p><strong>Privacy and security</strong><span>Your draft is stored only in this browser. This service does not transmit information to a government system.</span></p></div>
           </div>
         </div>
       </main>
-      <AdaptiveAssistant key={assistantSession} locale={language} onRestart={restartApplication} />
+      <AdaptiveAssistant key={assistantSession} locale={language} onRestart={restartApplication} onSubmit={submitApplication} submitted={Boolean(submissionReceipt)} />
     </div>
   )
 }
