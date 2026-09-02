@@ -74,7 +74,6 @@ const storyChapterLabels: Record<Locale, Record<StoryChapter, string>> = {
 
 const initialFastIntakeIds = [
   'travel_purpose', 'arrival_date', 'departure_date', 'destination_city', 'stay_address',
-  'prior_visits',
 ]
 
 const content = {
@@ -684,7 +683,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       )}
 
       {stage === 'interview' && !working && currentQuestion && (
-        <CurrentQuestionCard locale={locale} question={currentQuestion} chapter={currentChapter} speaking={speaking} onReplay={replayCurrentQuestion} />
+        <CurrentQuestionCard locale={locale} question={currentQuestion} chapter={currentChapter} focusCount={currentQuestionIds.length} speaking={speaking} onReplay={replayCurrentQuestion} />
       )}
 
       {stage === 'interview' && (
@@ -796,12 +795,13 @@ function AttentionReviewCard({
   )
 }
 
-function CurrentQuestionCard({ locale, question, chapter, speaking, onReplay }: { locale: Locale; question: string; chapter: StoryChapter; speaking: boolean; onReplay: () => void }) {
+function CurrentQuestionCard({ locale, question, chapter, focusCount, speaking, onReplay }: { locale: Locale; question: string; chapter: StoryChapter; focusCount: number; speaking: boolean; onReplay: () => void }) {
+  const visibleFocusCount = Math.max(1, Math.min(focusCount, 5))
   return (
     <section className="assistant-next-question" aria-live="polite" aria-label="Current question">
       <div className="assistant-next-question__label"><SparkleIcon /><span>{storyChapterLabels[locale][chapter]}</span><button onClick={onReplay} aria-label="Replay current question"><SpeakerIcon /> {speaking ? 'SPEAKING' : 'REPLAY'}</button><em>ANSWER THIS NEXT</em></div>
       <p>{question}</p>
-      <div className="assistant-next-question__scope"><span>Tell it naturally—I’ll connect the details and ask only about real gaps.</span></div>
+      <div className="assistant-next-question__scope"><strong>ONE ANSWER · {visibleFocusCount} RELATED DETAIL{visibleFocusCount === 1 ? '' : 'S'}</strong><span>Tell it naturally—I’ll connect everything and ask only about real gaps.</span></div>
     </section>
   )
 }

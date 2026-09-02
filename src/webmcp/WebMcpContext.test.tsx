@@ -138,11 +138,13 @@ describe('WebMcpProvider', () => {
     const currentQuestion = screen.getByRole('region', { name: 'Current question' })
     expect(currentQuestion).toHaveTextContent('Imagine you’re telling a friend about this trip')
     expect(currentQuestion).toHaveTextContent('STORY CHAPTER · YOUR TRIP')
+    expect(currentQuestion).toHaveTextContent('ONE ANSWER · 5 RELATED DETAILS')
     fireEvent.change(screen.getByPlaceholderText('Speak or type naturally…'), { target: { value: 'Tourism in New York from October 12 to October 21, 2026' } })
     fireEvent.click(screen.getByRole('button', { name: 'Send' }))
 
     await waitFor(() => expect(assistant).toHaveTextContent('Tourist visitor'), { timeout: 2500 })
     expect(screen.getByRole('region', { name: 'Current question' })).toHaveTextContent('Who will pay, and what are your employer and job title?')
+    expect(screen.getByRole('region', { name: 'Current question' })).toHaveTextContent('ONE ANSWER · 2 RELATED DETAILS')
     expect(screen.getByRole('region', { name: 'Application path' })).toHaveTextContent('Tourist visitor')
     expect(executeTool.mock.calls.map(([tool]) => tool.name)).toEqual(expect.arrayContaining([
       'select_application_flow', 'provide_interview_answers', 'derive_application_insights',

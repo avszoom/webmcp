@@ -3067,7 +3067,8 @@ textarea:focus-visible {
 .assistant-next-question__label button svg { width: 12px; height: 12px; }
 .assistant-next-question__label em { margin-left: auto; color: rgba(235,247,255,.66); font-size: 8px; font-style: normal; letter-spacing: .08em; }
 .assistant-next-question p { position: relative; margin: 6px 0 9px; color: #fff; font-size: 14px; font-weight: 700; line-height: 1.4; }
-.assistant-next-question__scope { position: relative; color: rgba(229,246,255,.7); font-size: 9px; line-height: 1.35; }
+.assistant-next-question__scope { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 9px; color: rgba(229,246,255,.7); font-size: 9px; line-height: 1.35; }
+.assistant-next-question__scope strong { flex: 0 0 auto; padding: 4px 7px; color: #dff9ff; background: rgba(87, 208, 255, .14); border: 1px solid rgba(143, 225, 255, .26); border-radius: 999px; font-size: 8px; letter-spacing: .06em; }
 .assistant-next-question--loading { border-color: rgba(154, 225, 255, .36); box-shadow: none; opacity: .88; }
 .assistant-next-question--loading p { color: rgba(241, 250, 255, .8); font-weight: 600; }
 .assistant-next-question--loading svg { animation: assistant-question-pulse 1.25s ease-in-out infinite; }
