@@ -2499,6 +2499,13 @@ textarea:focus-visible {
 .assistant-attach-button { padding: 7px 9px; display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; color: #005ea8; background: #eef7ff; border: 1px solid #68aee0; border-radius: 7px; cursor: pointer; font-size: 10px; font-weight: 700; }
 .assistant-attach-button svg { width: 14px; }
 .assistant-attach-button:disabled { opacity: .5; cursor: default; }
+.assistant-demo-pack-button { padding: 7px 9px; display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; color: #174f2b; background: #eef9f2; border: 1px solid #68b384; border-radius: 7px; cursor: pointer; font-size: 10px; font-weight: 700; }
+.assistant-demo-pack-button svg { width: 14px; }
+.assistant-demo-pack-button:disabled { opacity: .5; cursor: default; }
+.assistant-sample-links { margin: -2px 0 9px; color: #5c6461; font-size: 9px; }
+.assistant-sample-links summary { cursor: pointer; }
+.assistant-sample-links > div { margin-top: 6px; display: flex !important; grid-template-columns: none !important; flex-wrap: wrap; gap: 5px !important; }
+.assistant-sample-links a { padding: 4px 7px; color: #005ea8; background: #eef7ff; border-radius: 999px; text-decoration: none; }
 .assistant-document-chips { display: flex !important; flex-wrap: wrap; gap: 6px !important; margin-bottom: 9px; }
 .assistant-document-chips > span { padding: 6px 7px; display: inline-flex; align-items: center; gap: 5px; max-width: 100%; color: #184e77; background: #eaf6ff; border: 1px solid #9dcde9; border-radius: 999px; font-size: 9px; }
 .assistant-document-chips svg { width: 13px; flex: 0 0 auto; }
@@ -3142,6 +3149,9 @@ textarea:focus-visible {
 .assistant-glass-panel .assistant-composer > .assistant-input-row { grid-template-columns: 60px minmax(0,1fr) 76px; gap: 11px; }
 .assistant-glass-panel .assistant-document-row > span { color: rgba(226,242,255,.62); }
 .assistant-glass-panel .assistant-attach-button { color: #dff6ff; background: rgba(68,161,218,.16); border-color: rgba(126,210,255,.48); }
+.assistant-glass-panel .assistant-demo-pack-button { color: #dfffe9; background: rgba(62,190,112,.16); border-color: rgba(122,236,167,.45); }
+.assistant-glass-panel .assistant-sample-links { color: rgba(226,242,255,.62); }
+.assistant-glass-panel .assistant-sample-links a { color: #ddf6ff; background: rgba(68,161,218,.16); }
 .assistant-glass-panel .assistant-document-chips > span { color: #e8f8ff; background: rgba(49,153,219,.18); border-color: rgba(126,210,255,.42); }
 .assistant-glass-panel .assistant-composer textarea {
   min-height: 132px;

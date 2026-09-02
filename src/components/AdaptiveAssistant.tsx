@@ -112,6 +112,12 @@ const content = {
 } as const
 
 const questionMap = new Map(questions.map((question) => [question.id, question]))
+const demoDocuments = [
+  { name: 'demo-passport-aarav-mehta.pdf', label: 'Passport' },
+  { name: 'demo-degree-certificate-aarav-mehta.pdf', label: 'Degree' },
+  { name: 'demo-utility-bill-aarav-mehta.pdf', label: 'Utility bill' },
+  { name: 'demo-issued-flight-ticket-aarav-mehta.pdf', label: 'Flight ticket' },
+] as const
 const acceptedDocumentTypes = new Set<InterviewDocument['mime_type']>([
   'application/pdf', 'text/plain', 'image/jpeg', 'image/png', 'image/webp',
 ])
@@ -160,6 +166,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
   const [turnNumber, setTurnNumber] = useState(0)
   const [plannerError, setPlannerError] = useState<string | null>(null)
   const [attachedDocuments, setAttachedDocuments] = useState<InterviewDocument[]>([])
+  const [loadingDemoDocuments, setLoadingDemoDocuments] = useState(false)
   const recognitionRef = useRef<SpeechRecognition | null>(null)
   const keepListeningRef = useRef(false)
   const committedTranscriptRef = useRef('')
@@ -470,8 +477,8 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
     if (!files?.length) return
     setPlannerError(null)
     const selected = [...files]
-    if (attachedDocuments.length + selected.length > 3) {
-      setPlannerError('Attach no more than 3 documents at a time.')
+    if (attachedDocuments.length + selected.length > 4) {
+      setPlannerError('Attach no more than 4 documents at a time.')
       return
     }
     if (selected.some((file) => !acceptedDocumentTypes.has(file.type as InterviewDocument['mime_type']))) {
@@ -490,6 +497,25 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
       setPlannerError(error instanceof Error ? error.message : 'A document could not be read.')
     } finally {
       if (documentInputRef.current) documentInputRef.current.value = ''
+    }
+  }
+
+  const loadDemoDocumentPack = async () => {
+    if (working || listening || loadingDemoDocuments) return
+    setPlannerError(null)
+    setLoadingDemoDocuments(true)
+    try {
+      const documents = await Promise.all(demoDocuments.map(async ({ name }) => {
+        const response = await fetch(`/demo-documents/${name}`)
+        if (!response.ok) throw new Error('The demo document pack is temporarily unavailable.')
+        const blob = await response.blob()
+        return readDocument(new File([blob], name, { type: 'application/pdf' }))
+      }))
+      setAttachedDocuments(documents)
+    } catch (error) {
+      setPlannerError(error instanceof Error ? error.message : 'The demo document pack could not be loaded.')
+    } finally {
+      setLoadingDemoDocuments(false)
     }
   }
 
@@ -773,8 +799,15 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
             <button type="button" className="assistant-attach-button" onClick={() => documentInputRef.current?.click()} disabled={working || listening}>
               <FileIcon /> Attach documents
             </button>
-            <span>Passport, résumé, itinerary, or invitation · not stored by this website</span>
+            <button type="button" className="assistant-demo-pack-button" onClick={() => void loadDemoDocumentPack()} disabled={working || listening || loadingDemoDocuments}>
+              <SparkleIcon /> {loadingDemoDocuments ? 'Loading samples…' : 'Load demo pack'}
+            </button>
+            <span>Files are not stored by this website</span>
           </div>
+          <details className="assistant-sample-links">
+            <summary>View or download the 4 fictional sample documents</summary>
+            <div>{demoDocuments.map(({ name, label }) => <a key={name} href={`/demo-documents/${name}`} target="_blank" rel="noreferrer" download>{label}</a>)}</div>
+          </details>
           {attachedDocuments.length > 0 && (
             <div className="assistant-document-chips" aria-label="Attached documents">
               {attachedDocuments.map((document) => (
