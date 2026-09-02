@@ -138,7 +138,7 @@ Suggested outline:
 - **Live URL:** `https://adaptive-visitor-visa-webmcp.avszoom.chatgpt.site/`
 - **Private judge testing instructions:** use the Testing Instructions section above; no sign-in is required.
 - **Public code repository:** `https://github.com/avszoom/webmcp`
-- **Agents/clients tested:** confirm final wording; current evidence supports ChatGPT's in-app browser and WebMCP-enabled Chrome.
+- **Agents/clients tested:** ChatGPT's in-app browser; Google Chrome 152.0.7977.65 (Official Build, arm64) with WebMCP enabled; and VisaFlow's embedded Voice Application Guide, which discovers registered tools through `document.modelContext.getTools()` and executes them with `document.modelContext.executeTool()`.
 - **AI tools used:** OpenAI Responses API with GPT-5.6 Terra and Codex.
 - **Level of learning:** choose None, Moderate, or Significant.
 - **Career AI value:** choose Yes or No.
