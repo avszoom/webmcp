@@ -168,6 +168,27 @@ function extractOutputText(response) {
   return '';
 }
 
+function upstreamError(result) {
+  const error = result?.error || {};
+  const code = typeof error.code === 'string' ? error.code : 'UPSTREAM_ERROR';
+  const param = typeof error.param === 'string' ? error.param : '';
+  const message = typeof error.message === 'string' ? error.message : '';
+  const documentFailure = /file|pdf|document/i.test(code + ' ' + param + ' ' + message);
+  if (documentFailure) {
+    return {
+      error: 'One of the attached documents could not be processed. Use a valid PDF, TXT, JPG, PNG, or WebP file and try again.',
+      code,
+    };
+  }
+  if (code === 'context_length_exceeded') {
+    return {
+      error: 'The attached documents contain too much content. Try fewer or smaller files.',
+      code,
+    };
+  }
+  return { error: 'The AI planner could not respond.', code };
+}
+
 function rateLimit(request) {
   const now = Date.now();
   const key = request.headers.get('cf-connecting-ip') || 'unknown';
@@ -263,7 +284,12 @@ async function planInterview(request, env) {
             { type: 'input_text', text: JSON.stringify(payload) },
             ...documents.map((document) => document.mime_type.startsWith('image/')
               ? { type: 'input_image', image_url: 'data:' + document.mime_type + ';base64,' + document.data, detail: 'high' }
-              : { type: 'input_file', filename: document.name, file_data: document.data }),
+              : {
+                  type: 'input_file',
+                  filename: document.name,
+                  file_data: 'data:' + document.mime_type + ';base64,' + document.data,
+                  detail: document.mime_type === 'application/pdf' ? 'low' : undefined,
+                }),
           ],
         }],
         text: {
@@ -280,7 +306,7 @@ async function planInterview(request, env) {
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) {
-      return json({ error: 'The AI planner could not respond.', code: result?.error?.code || 'UPSTREAM_ERROR' }, response.status >= 500 ? 502 : 400);
+      return json(upstreamError(result), response.status >= 500 ? 502 : 400);
     }
     const outputText = extractOutputText(result);
     if (!outputText) return json({ error: 'The AI planner returned no usable plan.' }, 502);
