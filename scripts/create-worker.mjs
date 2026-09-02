@@ -140,7 +140,7 @@ const worker = `const INTERVIEW_SCHEMA = ${JSON.stringify(interviewSchema)};
 const SYSTEM_PROMPT = ${JSON.stringify(systemPrompt)};
 const MODEL = 'gpt-5.6-terra';
 const rateWindows = new Map();
-const MAX_DOCUMENTS = 5;
+const MAX_DOCUMENTS = 6;
 const MAX_DOCUMENT_BYTES = 4 * 1024 * 1024;
 const MAX_TOTAL_DOCUMENT_BYTES = 6 * 1024 * 1024;
 const MAX_REQUEST_CHARS = 8_500_000;
@@ -211,7 +211,7 @@ function rateLimit(request) {
 
 function normalizeDocuments(value) {
   if (value === undefined) return { documents: [] };
-  if (!Array.isArray(value) || value.length > MAX_DOCUMENTS) return { error: 'Attach no more than 5 documents.' };
+  if (!Array.isArray(value) || value.length > MAX_DOCUMENTS) return { error: 'Attach no more than 6 documents.' };
   const documents = [];
   let totalBytes = 0;
   for (const item of value) {

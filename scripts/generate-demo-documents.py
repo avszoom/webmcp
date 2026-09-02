@@ -383,6 +383,131 @@ def employment_letter():
     return path
 
 
+def brother_invitation_letter():
+    path = OUTPUT / "demo-brother-invitation-letter-aarav-mehta.pdf"
+    width, height = A4
+    c = canvas.Canvas(str(path), pagesize=A4, pageCompression=1)
+    c.setTitle("Fictional Demo Brother Invitation Letter - Aarav Mehta")
+    c.setAuthor("Adaptive Visitor Visa WebMCP Demo")
+    c.setFillColor(colors.HexColor("#FBFCFD"))
+    c.rect(0, 0, width, height, fill=1, stroke=0)
+
+    c.setFillColor(colors.HexColor("#214E56"))
+    c.rect(0, height - 43 * mm, width, 43 * mm, fill=1, stroke=0)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 20)
+    c.drawString(18 * mm, height - 17 * mm, "ROHAN MEHTA")
+    c.setFont("Helvetica", 8)
+    c.drawString(18 * mm, height - 24 * mm, "24 Maple Court, Apartment 7B, Long Island City, New York 11101, United States")
+    c.drawString(18 * mm, height - 30 * mm, "rohan.mehta@example.test  |  +1 212 555 0148")
+    c.setFillColor(GOLD)
+    c.roundRect(width - 50 * mm, height - 31 * mm, 32 * mm, 18 * mm, 2 * mm, fill=1, stroke=0)
+    c.setFillColor(colors.HexColor("#214E56"))
+    c.setFont("Helvetica-Bold", 8)
+    c.drawCentredString(width - 34 * mm, height - 21 * mm, "FAMILY HOST")
+    c.setFont("Helvetica", 6.5)
+    c.drawCentredString(width - 34 * mm, height - 26 * mm, "FICTIONAL DEMO")
+
+    c.setFillColor(MUTED)
+    c.setFont("Helvetica-Bold", 7)
+    c.drawString(18 * mm, height - 55 * mm, "DATE")
+    c.drawRightString(width - 18 * mm, height - 55 * mm, "REFERENCE")
+    c.setFillColor(INK)
+    c.setFont("Helvetica", 9)
+    c.drawString(18 * mm, height - 61 * mm, "16 September 2026")
+    c.drawRightString(width - 18 * mm, height - 61 * mm, "RM/INVITE/DEMO-2026")
+
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(width / 2, height - 76 * mm, "INVITATION & STATEMENT OF INTENT")
+    c.setFillColor(RED)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawCentredString(width / 2, height - 82 * mm, "FICTIONAL DEMONSTRATION LETTER - NOT VALID FOR IMMIGRATION USE")
+
+    body_style = ParagraphStyle(
+        "invitation-body",
+        fontName="Helvetica",
+        fontSize=9,
+        leading=13,
+        textColor=INK,
+    )
+    greeting = Paragraph(
+        "To whom it may concern: I, <b>Rohan Mehta</b>, am writing to invite my brother, "
+        "<b>Aarav Mehta</b>, to visit me in New York City for a short family visit. We plan to "
+        "spend time together and visit local attractions during his temporary stay.",
+        body_style,
+    )
+    greeting.wrapOn(c, width - 36 * mm, 32 * mm)
+    greeting.drawOn(c, 18 * mm, height - 108 * mm)
+
+    c.setFillColor(INK)
+    c.setFont("Helvetica-Bold", 9)
+    c.drawString(18 * mm, height - 119 * mm, "VISIT PLAN")
+    rows = [
+        ["VISITOR", "Aarav Mehta", "RELATIONSHIP", "Brother"],
+        ["PURPOSE", "Family visit and tourism", "DESTINATION", "New York City, USA"],
+        ["ARRIVAL", "4 October 2026", "DEPARTURE", "10 October 2026"],
+        ["STAY", "6 nights", "ACCOMMODATION", "Brother's residence"],
+    ]
+    table = Table(rows, colWidths=[28 * mm, 58 * mm, 34 * mm, 52 * mm], rowHeights=11 * mm)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#E8F1F2")),
+        ("BACKGROUND", (2, 0), (2, -1), colors.HexColor("#E8F1F2")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), INK),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
+        ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
+        ("FONTNAME", (3, 0), (3, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#BFD0D3")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+    ]))
+    table.wrapOn(c, width, height)
+    table.drawOn(c, 18 * mm, height - 169 * mm)
+
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(18 * mm, height - 181 * mm, "ADDRESS WHERE AARAV WILL STAY")
+    c.setFillColor(colors.HexColor("#E8F1F2"))
+    c.roundRect(18 * mm, height - 202 * mm, width - 36 * mm, 15 * mm, 2 * mm, fill=1, stroke=0)
+    c.setFillColor(INK)
+    c.setFont("Helvetica", 9)
+    c.drawString(24 * mm, height - 196 * mm, "24 Maple Court, Apartment 7B, Long Island City, New York 11101, United States")
+
+    funding = Paragraph(
+        "<b>Accommodation and expenses.</b> Aarav will stay with me at the address above at no charge. "
+        "He will pay for his round-trip airfare and personal expenses from his own employment income. "
+        "I will provide the accommodation and may help with local meals and transportation while he is here.",
+        body_style,
+    )
+    funding.wrapOn(c, width - 36 * mm, 32 * mm)
+    funding.drawOn(c, 18 * mm, height - 227 * mm)
+
+    intent = Paragraph(
+        "<b>Temporary-visit intent.</b> This visit is limited to the dates shown above. Aarav has a "
+        "return ticket for 10 October 2026 and expects to resume his employment in Mumbai on "
+        "12 October 2026. He will not work or study during this fictional demonstration visit.",
+        body_style,
+    )
+    intent.wrapOn(c, width - 36 * mm, 32 * mm)
+    intent.drawOn(c, 18 * mm, height - 251 * mm)
+
+    c.setStrokeColor(INK)
+    c.line(18 * mm, 34 * mm, 73 * mm, 34 * mm)
+    c.setFillColor(INK)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(18 * mm, 28 * mm, "ROHAN MEHTA - FICTIONAL HOST & BROTHER")
+    c.setFillColor(MUTED)
+    c.setFont("Helvetica", 7)
+    c.drawString(18 * mm, 23 * mm, "Available at the sample email and phone above for demo follow-up.")
+    c.setFillColor(RED)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawRightString(width - 18 * mm, 28 * mm, "NOT A REAL INVITATION")
+    watermark(c, width, height, "FICTIONAL BROTHER LETTER - NOT VALID")
+    footer(c, width, "Fictional relationship, purpose, stay address, dates, funding, and host contact data for WebMCP testing.")
+    c.save()
+    return path
+
+
 def flight_ticket():
     path = OUTPUT / "demo-issued-flight-ticket-aarav-mehta.pdf"
     width, height = landscape(A4)
@@ -460,6 +585,6 @@ def flight_ticket():
 
 
 if __name__ == "__main__":
-    for generated in (passport(), degree_certificate(), utility_bill(), flight_ticket(), employment_letter()):
+    for generated in (passport(), degree_certificate(), utility_bill(), flight_ticket(), employment_letter(), brother_invitation_letter()):
         copy2(generated, PUBLIC / generated.name)
         print(generated)
