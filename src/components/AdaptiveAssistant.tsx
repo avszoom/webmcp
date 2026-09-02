@@ -117,6 +117,7 @@ const demoDocuments = [
   { name: 'demo-degree-certificate-aarav-mehta.pdf', label: 'Degree' },
   { name: 'demo-utility-bill-aarav-mehta.pdf', label: 'Utility bill' },
   { name: 'demo-issued-flight-ticket-aarav-mehta.pdf', label: 'Flight ticket' },
+  { name: 'demo-employment-letter-aarav-mehta.pdf', label: 'Employment letter' },
 ] as const
 const acceptedDocumentTypes = new Set<InterviewDocument['mime_type']>([
   'application/pdf', 'text/plain', 'image/jpeg', 'image/png', 'image/webp',
@@ -477,8 +478,8 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
     if (!files?.length) return
     setPlannerError(null)
     const selected = [...files]
-    if (attachedDocuments.length + selected.length > 4) {
-      setPlannerError('Attach no more than 4 documents at a time.')
+    if (attachedDocuments.length + selected.length > 5) {
+      setPlannerError('Attach no more than 5 documents at a time.')
       return
     }
     if (selected.some((file) => !acceptedDocumentTypes.has(file.type as InterviewDocument['mime_type']))) {
@@ -805,7 +806,7 @@ export function AdaptiveAssistant({ locale, onRestart }: { locale: Locale; onRes
             <span>Files are not stored by this website</span>
           </div>
           <details className="assistant-sample-links">
-            <summary>View or download the 4 fictional sample documents</summary>
+            <summary>View or download the 5 fictional sample documents</summary>
             <div>{demoDocuments.map(({ name, label }) => <a key={name} href={`/demo-documents/${name}`} target="_blank" rel="noreferrer" download>{label}</a>)}</div>
           </details>
           {attachedDocuments.length > 0 && (

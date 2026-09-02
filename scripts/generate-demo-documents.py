@@ -1,4 +1,5 @@
 from pathlib import Path
+from shutil import copy2
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
@@ -13,6 +14,8 @@ from reportlab.platypus import Paragraph, Table, TableStyle
 
 OUTPUT = Path(__file__).resolve().parents[1] / "output" / "pdf"
 OUTPUT.mkdir(parents=True, exist_ok=True)
+PUBLIC = Path(__file__).resolve().parents[1] / "public" / "demo-documents"
+PUBLIC.mkdir(parents=True, exist_ok=True)
 
 INK = colors.HexColor("#17324D")
 BLUE = colors.HexColor("#0B5CAB")
@@ -66,7 +69,7 @@ def passport():
     c.setFillColor(INK)
     c.rect(0, height - 32 * mm, width, 32 * mm, fill=1, stroke=0)
     c.setFillColor(colors.white)
-    c.setFont("Helvetica-Bold", 17)
+    c.setFont("Helvetica-Bold", 15)
     c.drawString(18 * mm, height - 17 * mm, "REPUBLIC OF INDIA - DEMONSTRATION PASSPORT")
     c.setFont("Helvetica", 8)
     c.drawString(18 * mm, height - 23 * mm, "Sample identity document created exclusively for the WebMCP application demo")
@@ -239,6 +242,147 @@ def utility_bill():
     return path
 
 
+def employment_letter():
+    path = OUTPUT / "demo-employment-letter-aarav-mehta.pdf"
+    width, height = A4
+    c = canvas.Canvas(str(path), pagesize=A4, pageCompression=1)
+    c.setTitle("Fictional Demo Employment Letter - Aarav Mehta")
+    c.setAuthor("Adaptive Visitor Visa WebMCP Demo")
+    c.setFillColor(colors.white)
+    c.rect(0, 0, width, height, fill=1, stroke=0)
+
+    c.setFillColor(INK)
+    c.rect(0, height - 42 * mm, width, 42 * mm, fill=1, stroke=0)
+    c.setFillColor(GOLD)
+    c.roundRect(18 * mm, height - 31 * mm, 22 * mm, 22 * mm, 3 * mm, fill=1, stroke=0)
+    c.setFillColor(INK)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawCentredString(29 * mm, height - 22 * mm, "ABC")
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 17)
+    c.drawString(47 * mm, height - 17 * mm, "ABC TECHNOLOGIES PRIVATE LIMITED")
+    c.setFont("Helvetica", 7.5)
+    c.drawString(47 * mm, height - 24 * mm, "8th Floor, Tata Towers, Plot C-26, Bandra Kurla Complex, Bandra East")
+    c.drawString(47 * mm, height - 29 * mm, "Mumbai, Maharashtra 400051, India")
+    c.setFillColor(GOLD)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawRightString(width - 18 * mm, height - 34 * mm, "HR & PEOPLE OPERATIONS")
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica", 7)
+    c.drawRightString(width - 18 * mm, height - 39 * mm, "hr-verification@example.test  |  +91 22 0000 0000")
+
+    c.setFillColor(MUTED)
+    c.setFont("Helvetica-Bold", 7)
+    c.drawString(18 * mm, height - 53 * mm, "REFERENCE")
+    c.drawRightString(width - 18 * mm, height - 53 * mm, "DATE")
+    c.setFillColor(INK)
+    c.setFont("Helvetica", 9)
+    c.drawString(18 * mm, height - 59 * mm, "ABC/HR/DEMO/2026/0915")
+    c.drawRightString(width - 18 * mm, height - 59 * mm, "15 September 2026")
+
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(width / 2, height - 73 * mm, "EMPLOYMENT & NO-OBJECTION LETTER")
+    c.setFillColor(RED)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawCentredString(width / 2, height - 79 * mm, "FICTIONAL DEMONSTRATION DOCUMENT - NOT VALID FOR VERIFICATION")
+
+    body_style = ParagraphStyle(
+        "employment-body",
+        fontName="Helvetica",
+        fontSize=9,
+        leading=13,
+        textColor=INK,
+    )
+    intro = Paragraph(
+        "To whom it may concern: This letter confirms that <b>Aarav Mehta</b> is employed by "
+        "ABC Technologies Private Limited. The employment and compensation details below are "
+        "synthetic and exist only to test document extraction in the Adaptive Visitor Visa WebMCP demo.",
+        body_style,
+    )
+    intro.wrapOn(c, width - 36 * mm, 35 * mm)
+    intro.drawOn(c, 18 * mm, height - 105 * mm)
+
+    rows = [
+        ["EMPLOYEE", "Aarav Mehta", "EMPLOYEE ID", "ABC-DEMO-0422"],
+        ["JOB TITLE", "Software Engineer", "DEPARTMENT", "Product Engineering"],
+        ["EMPLOYMENT", "Full-time, permanent", "START DATE", "22 April 2022"],
+        ["MONTHLY GROSS", "INR 185,000", "ANNUAL GROSS", "INR 2,220,000"],
+    ]
+    table = Table(rows, colWidths=[31 * mm, 55 * mm, 31 * mm, 55 * mm], rowHeights=11 * mm)
+    table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), LIGHT),
+        ("BACKGROUND", (2, 0), (2, -1), LIGHT),
+        ("TEXTCOLOR", (0, 0), (-1, -1), INK),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (2, 0), (2, -1), "Helvetica-Bold"),
+        ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
+        ("FONTNAME", (3, 0), (3, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD7DF")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+    ]))
+    table.wrapOn(c, width, height)
+    table.drawOn(c, 18 * mm, height - 157 * mm)
+
+    c.setFillColor(INK)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(18 * mm, height - 169 * mm, "PRIMARY WORKPLACE ADDRESS")
+    c.setFillColor(LIGHT)
+    c.roundRect(18 * mm, height - 190 * mm, width - 36 * mm, 15 * mm, 2 * mm, fill=1, stroke=0)
+    c.setFillColor(INK)
+    c.setFont("Helvetica", 9)
+    c.drawString(24 * mm, height - 184 * mm, "8th Floor, Tata Towers, Plot C-26, Bandra Kurla Complex, Bandra East, Mumbai, Maharashtra 400051, India")
+
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(18 * mm, height - 202 * mm, "EMPLOYEE FAMILY DETAILS RECORDED FOR THIS FICTIONAL DEMO")
+    family = Table(
+        [["FATHER'S FULL NAME", "Rajesh Mehta", "MOTHER'S FULL NAME", "Sunita Mehta"]],
+        colWidths=[39 * mm, 47 * mm, 39 * mm, 47 * mm],
+        rowHeights=12 * mm,
+    )
+    family.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, 0), colors.HexColor("#FFF4E5")),
+        ("BACKGROUND", (2, 0), (2, 0), colors.HexColor("#FFF4E5")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), INK),
+        ("FONTNAME", (0, 0), (0, 0), "Helvetica-Bold"),
+        ("FONTNAME", (2, 0), (2, 0), "Helvetica-Bold"),
+        ("FONTNAME", (1, 0), (1, 0), "Helvetica"),
+        ("FONTNAME", (3, 0), (3, 0), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#D9C894")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 7),
+    ]))
+    family.wrapOn(c, width, height)
+    family.drawOn(c, 18 * mm, height - 218 * mm)
+
+    leave = Paragraph(
+        "The company has no objection to the employee's fictional personal visit to the United States "
+        "from <b>4 October 2026 through 10 October 2026</b>. Demonstration leave is recorded for those "
+        "dates, and the employee is expected to resume duties on <b>12 October 2026</b>.",
+        body_style,
+    )
+    leave.wrapOn(c, width - 36 * mm, 28 * mm)
+    leave.drawOn(c, 18 * mm, height - 240 * mm)
+
+    c.setStrokeColor(INK)
+    c.line(18 * mm, 35 * mm, 73 * mm, 35 * mm)
+    c.setFillColor(INK)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawString(18 * mm, 29 * mm, "NEHA SHARMA - DEMO HR MANAGER")
+    c.setFillColor(MUTED)
+    c.setFont("Helvetica", 7)
+    c.drawString(18 * mm, 24 * mm, "Digitally prepared for demonstration; no real signature is present.")
+    c.setFillColor(RED)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawRightString(width - 18 * mm, 29 * mm, "NOT A REAL EMPLOYMENT RECORD")
+    watermark(c, width, height, "FICTIONAL EMPLOYMENT LETTER - NOT VALID")
+    footer(c, width, "Fictional employer, salary, family, workplace, and leave data for WebMCP extraction testing.")
+    c.save()
+    return path
+
+
 def flight_ticket():
     path = OUTPUT / "demo-issued-flight-ticket-aarav-mehta.pdf"
     width, height = landscape(A4)
@@ -316,5 +460,6 @@ def flight_ticket():
 
 
 if __name__ == "__main__":
-    for generated in (passport(), degree_certificate(), utility_bill(), flight_ticket()):
+    for generated in (passport(), degree_certificate(), utility_bill(), flight_ticket(), employment_letter()):
+        copy2(generated, PUBLIC / generated.name)
         print(generated)
