@@ -508,6 +508,157 @@ def brother_invitation_letter():
     return path
 
 
+def bank_statement():
+    path = OUTPUT / "demo-bank-statement-aarav-mehta.pdf"
+    width, height = A4
+    c = canvas.Canvas(str(path), pagesize=A4, pageCompression=1)
+    c.setTitle("Fictional Demo Bank Statement - Aarav Mehta")
+    c.setAuthor("Adaptive Visitor Visa WebMCP Demo")
+    c.setFillColor(colors.white)
+    c.rect(0, 0, width, height, fill=1, stroke=0)
+
+    bank_blue = colors.HexColor("#113A5C")
+    mint = colors.HexColor("#DDF4EC")
+    green = colors.HexColor("#147D64")
+    pale_blue = colors.HexColor("#EAF2F8")
+
+    c.setFillColor(bank_blue)
+    c.rect(0, height - 43 * mm, width, 43 * mm, fill=1, stroke=0)
+    c.setFillColor(colors.white)
+    c.setFont("Helvetica-Bold", 20)
+    c.drawString(18 * mm, height - 17 * mm, "HARBORLINE BANK INDIA - DEMO")
+    c.setFont("Helvetica", 8)
+    c.drawString(18 * mm, height - 24 * mm, "Fictional retail banking statement created for document-intake testing")
+    c.drawString(18 * mm, height - 30 * mm, "Demo Service Centre, Bandra Kurla Complex, Mumbai 400051, India")
+    c.setFillColor(GOLD)
+    c.roundRect(width - 56 * mm, height - 32 * mm, 38 * mm, 20 * mm, 2 * mm, fill=1, stroke=0)
+    c.setFillColor(bank_blue)
+    c.setFont("Helvetica-Bold", 9)
+    c.drawCentredString(width - 37 * mm, height - 21 * mm, "STATEMENT")
+    c.setFont("Helvetica", 7)
+    c.drawCentredString(width - 37 * mm, height - 27 * mm, "AUGUST 2026")
+
+    c.setFillColor(colors.HexColor("#FFF1F0"))
+    c.roundRect(18 * mm, height - 58 * mm, width - 36 * mm, 9 * mm, 2 * mm, fill=1, stroke=0)
+    c.setFillColor(RED)
+    c.setFont("Helvetica-Bold", 8)
+    c.drawCentredString(width / 2, height - 55 * mm, "FICTIONAL DEMONSTRATION STATEMENT - NOT ISSUED BY A REAL BANK")
+
+    c.setFillColor(MUTED)
+    c.setFont("Helvetica-Bold", 7)
+    c.drawString(18 * mm, height - 68 * mm, "ACCOUNT HOLDER")
+    c.drawString(112 * mm, height - 68 * mm, "STATEMENT DETAILS")
+    c.setFillColor(INK)
+    c.setFont("Helvetica-Bold", 12)
+    c.drawString(18 * mm, height - 76 * mm, "AARAV MEHTA")
+    c.setFont("Helvetica", 8.5)
+    holder_lines = [
+        "116, Second Floor, Nara Apartments, Sector 6",
+        "Panvel, Maharashtra 410206, India",
+        "aarav.mehta@example.test  |  +91 90000 00000",
+    ]
+    for index, line in enumerate(holder_lines):
+        c.drawString(18 * mm, height - (83 + index * 5.5) * mm, line)
+
+    details = [
+        ("Account type", "Savings - salary account"),
+        ("Account number", "XXXX XXXX 0019 (DEMO)"),
+        ("Customer ID", "DEMO-AAM-1994"),
+        ("Statement period", "01 Aug 2026 - 31 Aug 2026"),
+        ("Statement issued", "01 Sep 2026"),
+    ]
+    for index, (label, value) in enumerate(details):
+        y = height - (75 + index * 6) * mm
+        c.setFillColor(MUTED)
+        c.setFont("Helvetica-Bold", 7)
+        c.drawString(112 * mm, y, label.upper())
+        c.setFillColor(INK)
+        c.setFont("Helvetica", 8.5)
+        c.drawRightString(width - 18 * mm, y, value)
+
+    summary_y = height - 128 * mm
+    c.setFillColor(bank_blue)
+    c.roundRect(18 * mm, summary_y, width - 36 * mm, 25 * mm, 3 * mm, fill=1, stroke=0)
+    summary = [
+        ("OPENING BALANCE", "INR 1,145,600.00"),
+        ("TOTAL CREDITS", "INR 188,120.00"),
+        ("TOTAL DEBITS", "INR 176,950.00"),
+        ("CLOSING / AVAILABLE", "INR 1,156,770.00"),
+    ]
+    col_width = (width - 36 * mm) / 4
+    for index, (label, value) in enumerate(summary):
+        x = 18 * mm + index * col_width
+        if index:
+            c.setStrokeColor(colors.HexColor("#6E879A"))
+            c.line(x, summary_y + 5 * mm, x, summary_y + 20 * mm)
+        c.setFillColor(colors.HexColor("#C9D8E3"))
+        c.setFont("Helvetica-Bold", 6.5)
+        c.drawCentredString(x + col_width / 2, summary_y + 16 * mm, label)
+        c.setFillColor(colors.white if index < 3 else colors.HexColor("#9FF0D7"))
+        c.setFont("Helvetica-Bold", 10 if index < 3 else 10.5)
+        c.drawCentredString(x + col_width / 2, summary_y + 8 * mm, value)
+
+    c.setFillColor(INK)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(18 * mm, height - 135 * mm, "TRANSACTION ACTIVITY")
+    c.setFillColor(MUTED)
+    c.setFont("Helvetica", 7)
+    c.drawRightString(width - 18 * mm, height - 135 * mm, "All amounts in Indian rupees (INR)")
+
+    transactions = [
+        ["01 Aug", "Opening balance", "-", "-", "1,145,600.00"],
+        ["03 Aug", "Panvel Municipal Energy - DEMO-0526-8841", "2,840.00", "-", "1,142,760.00"],
+        ["05 Aug", "Salary credit - ABC Technologies Pvt Ltd", "-", "185,000.00", "1,327,760.00"],
+        ["07 Aug", "Monthly housing transfer", "42,000.00", "-", "1,285,760.00"],
+        ["12 Aug", "Groceries and household purchases", "12,450.00", "-", "1,273,310.00"],
+        ["18 Aug", "Northstar Air - DEMO6X2 round-trip ticket", "96,450.00", "-", "1,176,860.00"],
+        ["22 Aug", "Demo travel insurance policy", "8,210.00", "-", "1,168,650.00"],
+        ["25 Aug", "International travel card funding", "15,000.00", "-", "1,153,650.00"],
+        ["31 Aug", "Monthly savings interest", "-", "3,120.00", "1,156,770.00"],
+    ]
+    tx_table = Table(
+        [["DATE", "DESCRIPTION", "DEBIT", "CREDIT", "BALANCE"]] + transactions,
+        colWidths=[19 * mm, 79 * mm, 25 * mm, 25 * mm, 30 * mm],
+        rowHeights=[8 * mm] + [9 * mm] * len(transactions),
+    )
+    tx_table.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), bank_blue),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 7),
+        ("BACKGROUND", (0, 1), (-1, -1), colors.white),
+        ("BACKGROUND", (0, 2), (-1, 2), pale_blue),
+        ("BACKGROUND", (0, 4), (-1, 4), pale_blue),
+        ("BACKGROUND", (0, 6), (-1, 6), pale_blue),
+        ("BACKGROUND", (0, 8), (-1, 8), pale_blue),
+        ("TEXTCOLOR", (0, 1), (-1, -1), INK),
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTNAME", (4, 1), (4, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 1), (-1, -1), 7.3),
+        ("ALIGN", (2, 0), (-1, -1), "RIGHT"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#CBD7DF")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    tx_table.wrapOn(c, width, height)
+    tx_table.drawOn(c, 16 * mm, height - 230 * mm)
+
+    c.setFillColor(mint)
+    c.roundRect(18 * mm, 38 * mm, width - 36 * mm, 24 * mm, 3 * mm, fill=1, stroke=0)
+    c.setFillColor(green)
+    c.setFont("Helvetica-Bold", 11)
+    c.drawString(24 * mm, 52 * mm, "AVAILABLE FUNDS AT 31 AUGUST 2026: INR 1,156,770.00")
+    c.setFillColor(INK)
+    c.setFont("Helvetica", 7.5)
+    c.drawString(24 * mm, 45 * mm, "The balance, employer credit, transactions, institution, identifiers, and customer data are entirely synthetic.")
+
+    watermark(c, width, height, "FICTIONAL BANK STATEMENT - NOT VALID")
+    footer(c, width, "Fictional proof-of-funds sample. Not valid for banking, credit, immigration, identity, or financial verification.")
+    c.save()
+    return path
+
+
 def flight_ticket():
     path = OUTPUT / "demo-issued-flight-ticket-aarav-mehta.pdf"
     width, height = landscape(A4)
@@ -585,6 +736,6 @@ def flight_ticket():
 
 
 if __name__ == "__main__":
-    for generated in (passport(), degree_certificate(), utility_bill(), flight_ticket(), employment_letter(), brother_invitation_letter()):
+    for generated in (passport(), degree_certificate(), utility_bill(), flight_ticket(), employment_letter(), brother_invitation_letter(), bank_statement()):
         copy2(generated, PUBLIC / generated.name)
         print(generated)
