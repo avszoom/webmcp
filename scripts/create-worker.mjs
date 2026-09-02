@@ -265,7 +265,7 @@ async function planInterview(request, env) {
   if (!env.OPENAI_API_KEY) return json({ error: 'The AI interview is not configured.' }, 503);
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
+  const timeout = setTimeout(() => controller.abort(), 45000);
   try {
     const response = await fetch('https://api.openai.com/v1/responses', {
       method: 'POST',
@@ -300,7 +300,7 @@ async function planInterview(request, env) {
             schema: INTERVIEW_SCHEMA,
           },
         },
-        max_output_tokens: 1800,
+        max_output_tokens: 4000,
         store: false,
       }),
     });
@@ -310,6 +310,9 @@ async function planInterview(request, env) {
     }
     const outputText = extractOutputText(result);
     if (!outputText) return json({ error: 'The AI planner returned no usable plan.' }, 502);
+    if (result.status === 'incomplete') {
+      return json({ error: 'The AI planner could not finish the document extraction. Please try the same documents again.' }, 502);
+    }
     let plan;
     try {
       plan = JSON.parse(outputText);
